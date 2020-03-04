@@ -1,4 +1,4 @@
-package com.example.liquiquali
+package com.uft.liquiquali
 
 import androidx.annotation.NonNull;
 import io.flutter.embedding.android.FlutterActivity
