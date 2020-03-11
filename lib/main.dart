@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 
+import 'pages/preview_page.dart';
+
 class CameraExampleHome extends StatefulWidget {
   @override
   _CameraExampleHomeState createState() {
@@ -34,15 +36,12 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     with WidgetsBindingObserver {
   CameraController controller;
   String imagePath;
-  String videoPath;
-  VideoPlayerController videoController;
-  VoidCallback videoPlayerListener;
-  bool enableAudio = true;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    onNewCameraSelected(cameras[0]);
   }
 
   @override
@@ -76,30 +75,37 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
           children: <Widget>[
             _cameraPreviewWidget(),
             _customAppBar(),
-            _cameraTogglesRowWidget()
+            _cameraTogglesRowWidget(),
           ],
         ));
   }
 
   Widget _takePhotoButton() {
-    return RaisedButton.icon(
-        elevation: 4.0,
-        icon: Icon(Icons.photo_camera, color: Colors.white),
-        color: Colors.black54,
-        label: Text("Analisar",
-            style: TextStyle(color: Colors.white, fontSize: 16.0)),
-        onPressed: () {});
+    return Container(
+        margin: EdgeInsets.symmetric(vertical: 30),
+        child: RaisedButton.icon(
+            elevation: 4.0,
+            icon: Icon(Icons.photo_camera, color: Colors.white),
+            color: Colors.black54,
+            label: Text("Analisar",
+                style: TextStyle(color: Colors.white, fontSize: 16.0)),
+            onPressed: () => onTakePictureButtonPressed()));
   }
 
   Widget _customAppBar() {
     return Positioned(
-      child: AppBar(
-        centerTitle: true,
-        title:
-            Text("LiquiQuali", style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.transparent,
-      ),
-    );
+        child: AppBar(
+      centerTitle: true,
+      title: Text("LiquiQuali",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            shadows: <Shadow>[
+              Shadow(
+                  offset: Offset(0, 0.3), blurRadius: 5, color: Colors.black54)
+            ],
+          )),
+      backgroundColor: Colors.transparent,
+    ));
   }
 
   /// Display the preview from the camera (or a message if the preview is not available).
@@ -143,26 +149,20 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            videoController == null && imagePath == null
+            imagePath == null
                 ? Container()
-                : SizedBox(
-                    child: (videoController == null)
-                        ? Image.file(File(imagePath))
-                        : Container(
-                            child: Center(
-                              child: AspectRatio(
-                                  aspectRatio:
-                                      videoController.value.size != null
-                                          ? videoController.value.aspectRatio
-                                          : 1.0,
-                                  child: VideoPlayer(videoController)),
-                            ),
-                            decoration: BoxDecoration(
-                                border: Border.all(color: Colors.pink)),
-                          ),
-                    width: 64.0,
-                    height: 64.0,
-                  ),
+                : GestureDetector(
+                    child: SizedBox(
+                        child: Image.file(
+                      File(imagePath),
+                      width: 64.0,
+                      height: 64.0,
+                    )),
+                    onTap: () =>
+                        Navigator.push(context, MaterialPageRoute(builder: (_) {
+                      return PreviewPage(imagePath);
+                    })),
+                  )
           ],
         ),
       ),
@@ -193,6 +193,8 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
           ),
         );
       }
+
+      toggles.add(_thumbnailWidget());
     }
 
     return Positioned(
@@ -214,7 +216,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     controller = CameraController(
       cameraDescription,
       ResolutionPreset.medium,
-      enableAudio: enableAudio,
+      enableAudio: false,
     );
 
     // If the controller is updated then update the UI
@@ -241,14 +243,28 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
       if (mounted) {
         setState(() {
           imagePath = filePath;
-          videoController?.dispose();
-          videoController = null;
         });
         if (filePath != null) showInSnackBar('Picture saved to $filePath');
 
         image.Image finalImage = await ImageHelper.getImage(filePath);
 
-        //var test = finalImage.getPixelSafe(5, 5);
+        for (var i = 0; i < finalImage.width; i++) {
+          for (var j = 0; j < finalImage.height; j++) {
+            var color = Color(finalImage.getPixelSafe(i, j));
+            if (color.red > 150) {
+              finalImage.setPixelSafe(i, j, Colors.black.value);
+            } else {
+              finalImage.setPixelSafe(i, j, Colors.white.value);
+            }
+          }
+        }
+
+        ImageHelper.saveImage(finalImage, imagePath)
+            .then((String newPath) async {
+          setState(() {
+            imagePath = newPath;
+          });
+        });
       }
     });
   }
