@@ -1,11 +1,7 @@
-// Copyright 2019 The Chromium Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
-// ignore_for_file: public_member_api_docs
-
 import 'dart:async';
 import 'dart:io';
+import 'package:image/image.dart' as image;
+import 'package:LiquiQuali/helpers/utils.dart';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -76,44 +72,18 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      key: _scaffoldKey,
-      appBar: AppBar(
-        title: const Text('Camera example'),
-      ),
-      body: Column(
-        children: <Widget>[
-          Expanded(
-            child: Container(
-              child: Padding(
-                padding: const EdgeInsets.all(1.0),
-                child: Center(
-                  child: _cameraPreviewWidget(),
-                ),
-              ),
-              decoration: BoxDecoration(
-                color: Colors.black,
-                border: Border.all(
-                  color: controller != null && controller.value.isRecordingVideo
-                      ? Colors.redAccent
-                      : Colors.grey,
-                  width: 3.0,
-                ),
-              ),
-            ),
-          ),
-          _captureControlRowWidget(),
-          _toggleAudioWidget(),
-          Padding(
-            padding: const EdgeInsets.all(5.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: <Widget>[
-                _cameraTogglesRowWidget(),
-                _thumbnailWidget(),
-              ],
-            ),
-          ),
-        ],
+        key: _scaffoldKey,
+        body: Stack(
+          children: <Widget>[_cameraPreviewWidget(), _customAppBar(), _cameraTogglesRowWidget()],
+        ));
+  }
+
+  Widget _customAppBar() {
+    return Positioned(
+      child: AppBar(
+        title:
+            Text("LiquiQuali", style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.transparent,
       ),
     );
   }
@@ -122,7 +92,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
   Widget _cameraPreviewWidget() {
     if (controller == null || !controller.value.isInitialized) {
       return const Text(
-        'Tap a camera',
+        'Escolha uma câmera',
         style: TextStyle(
           color: Colors.white,
           fontSize: 24.0,
@@ -130,32 +100,25 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
         ),
       );
     } else {
-      return AspectRatio(
-        aspectRatio: controller.value.aspectRatio,
-        child: CameraPreview(controller),
+      final size = MediaQuery.of(context).size;
+
+      if (!controller.value.isInitialized) {
+        return Container();
+      }
+      return ClipRect(
+        child: Container(
+          child: Transform.scale(
+            scale: controller.value.aspectRatio / size.aspectRatio,
+            child: Center(
+              child: AspectRatio(
+                aspectRatio: controller.value.aspectRatio,
+                child: CameraPreview(controller),
+              ),
+            ),
+          ),
+        ),
       );
     }
-  }
-
-  /// Toggle recording audio
-  Widget _toggleAudioWidget() {
-    return Padding(
-      padding: const EdgeInsets.only(left: 25),
-      child: Row(
-        children: <Widget>[
-          const Text('Enable Audio:'),
-          Switch(
-            value: enableAudio,
-            onChanged: (bool value) {
-              enableAudio = value;
-              if (controller != null) {
-                onNewCameraSelected(controller.description);
-              }
-            },
-          ),
-        ],
-      ),
-    );
   }
 
   /// Display the thumbnail of the captured image or video.
@@ -285,7 +248,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
       enableAudio: enableAudio,
     );
 
-    // If the controller is updated then update the UI.
+    // If the controller is updated then update the UI
     controller.addListener(() {
       if (mounted) setState(() {});
       if (controller.value.hasError) {
@@ -305,7 +268,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
   }
 
   void onTakePictureButtonPressed() {
-    takePicture().then((String filePath) {
+    takePicture().then((String filePath) async {
       if (mounted) {
         setState(() {
           imagePath = filePath;
@@ -313,6 +276,10 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
           videoController = null;
         });
         if (filePath != null) showInSnackBar('Picture saved to $filePath');
+
+        image.Image finalImage = await ImageHelper.getImage(filePath);
+
+        //var test = finalImage.getPixelSafe(5, 5);
       }
     });
   }
@@ -469,6 +436,7 @@ class CameraApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       home: CameraExampleHome(),
     );
   }
@@ -477,7 +445,6 @@ class CameraApp extends StatelessWidget {
 List<CameraDescription> cameras = [];
 
 Future<void> main() async {
-  // Fetch the available cameras before initializing the app.
   try {
     WidgetsFlutterBinding.ensureInitialized();
     cameras = await availableCameras();
