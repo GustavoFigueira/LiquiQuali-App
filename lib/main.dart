@@ -1,13 +1,12 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:image/image.dart' as image;
-import 'package:LiquiQuali/helpers/utils.dart';
-
+import 'package:permission_handler/permission_handler.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:video_player/video_player.dart';
+import 'package:image/image.dart' as image;
 
+import 'helpers/utils.dart';
 import 'pages/preview_page.dart';
 
 class CameraExampleHome extends StatefulWidget {
@@ -36,12 +35,39 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     with WidgetsBindingObserver {
   CameraController controller;
   String imagePath;
+  CameraLensDirection currentCamera;
+  final PermissionHandler _permissionHandler = PermissionHandler();
+
+  Future<void> requestPermissions(List<PermissionGroup> permissions,
+      {Function onPermissionDenied}) async {
+    var result = await _permissionHandler.requestPermissions(permissions);
+    for (PermissionGroup permission in permissions) {
+      if (result[permission] != PermissionStatus.granted) {
+        onPermissionDenied();
+      }
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    onNewCameraSelected(cameras[0]);
+    requestPermissions(
+        <PermissionGroup>[PermissionGroup.camera]).then((bool) {
+          onNewCameraSelected(cameras[0]);
+        });
+    setLastAnalysis();
+  }
+
+  Future<void> setLastAnalysis() async {
+    final Directory extDir = await getApplicationDocumentsDirectory();
+    final String dirPath = '${extDir.path}/LiquiQuali';
+    // Caso queira deletar
+    //dirPath.deleteSync(recursive: true);
+    var filesList = Directory(dirPath).listSync();
+    setState(() {
+      imagePath = filesList.last.path;
+    });
   }
 
   @override
@@ -52,7 +78,6 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // App state changed before we got the chance to initialize.
     if (controller == null || !controller.value.isInitialized) {
       return;
     }
@@ -152,12 +177,17 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
             imagePath == null
                 ? Container()
                 : GestureDetector(
-                    child: SizedBox(
-                        child: Image.file(
-                      File(imagePath),
-                      width: 64.0,
-                      height: 64.0,
-                    )),
+                    child: Container(
+                      margin:
+                          EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+                      height: 60,
+                      width: 40,
+                      color: Colors.black54,
+                      child: Image(
+                        image: FileImage(File(imagePath)),
+                        fit: BoxFit.fitWidth,
+                      ),
+                    ),
                     onTap: () =>
                         Navigator.push(context, MaterialPageRoute(builder: (_) {
                       return PreviewPage(imagePath);
@@ -216,10 +246,8 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     controller = CameraController(
       cameraDescription,
       ResolutionPreset.medium,
-      enableAudio: false,
     );
 
-    // If the controller is updated then update the UI
     controller.addListener(() {
       if (mounted) setState(() {});
       if (controller.value.hasError) {
@@ -244,22 +272,26 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
         setState(() {
           imagePath = filePath;
         });
-        if (filePath != null) showInSnackBar('Picture saved to $filePath');
+        if (filePath == null) return;
 
         image.Image finalImage = await ImageHelper.getImage(filePath);
 
         for (var i = 0; i < finalImage.width; i++) {
           for (var j = 0; j < finalImage.height; j++) {
             var color = Color(finalImage.getPixelSafe(i, j));
-            if (color.red > 150) {
+            if (color.computeLuminance() > 0 && color.computeLuminance() < 0.25) {
+              finalImage.setPixelSafe(i, j, Colors.red.value);
+            } else if (color.computeLuminance() >= 0.25 && color.computeLuminance() < 0.5) {
               finalImage.setPixelSafe(i, j, Colors.black.value);
+            } else if (color.computeLuminance() >= 0.5 && color.computeLuminance() < 0.75) {
+              finalImage.setPixelSafe(i, j, Colors.blue.value);
             } else {
-              finalImage.setPixelSafe(i, j, Colors.white.value);
+              finalImage.setPixelSafe(i, j, Colors.green.value);
             }
           }
         }
 
-        ImageHelper.saveImage(finalImage, imagePath)
+        await ImageHelper.saveImage(finalImage, imagePath)
             .then((String newPath) async {
           setState(() {
             imagePath = newPath;
@@ -274,10 +306,15 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
       showInSnackBar('Erro: selecione uma câmera antes.');
       return null;
     }
+    
     final Directory extDir = await getApplicationDocumentsDirectory();
-    final String dirPath = '${extDir.path}/Pictures/LiquiQuali';
-    await Directory(dirPath).create(recursive: true);
-    final String filePath = '$dirPath/${timestamp()}.jpg';
+    final String dirPath = '${extDir.path}/LiquiQuali';
+    bool exist = await File(dirPath).exists();
+    if (!exist) {
+      Directory(dirPath).create(recursive: true);
+    }
+
+    final String filePath = '$dirPath/${timestamp()}.png';
 
     if (controller.value.isTakingPicture) {
       // A capture is already pending, do nothing.
@@ -290,6 +327,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
       _showCameraException(e);
       return null;
     }
+
     return filePath;
   }
 

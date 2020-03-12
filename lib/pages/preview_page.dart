@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -25,11 +27,16 @@ class _PreviewPageState extends State<PreviewPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Text('Medição'),
+        backgroundColor: Colors.transparent,
+      ),
+      backgroundColor: Colors.black,
       body: GestureDetector(
         child: Center(
           child: Hero(
             tag: 'imageHero',
-            child: Image.asset(widget.imagePath)
+            child:  Image.file(File(widget.imagePath))
           ),
         ),
         onTap: () {
