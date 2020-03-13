@@ -15,7 +15,8 @@ dependencies:
   path_provider:
   permission_handler:
   shared_preferences:
-
+  exif: 
+  
 dev_dependencies:
    flutter_test:
     sdk: flutter

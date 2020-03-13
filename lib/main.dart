@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as image;
 
+import 'helpers/turbidity.dart';
 import 'helpers/utils.dart';
 import 'pages/preview_page.dart';
 
@@ -52,10 +53,9 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    requestPermissions(
-        <PermissionGroup>[PermissionGroup.camera]).then((bool) {
-          onNewCameraSelected(cameras[0]);
-        });
+    requestPermissions(<PermissionGroup>[PermissionGroup.camera]).then((bool) {
+      onNewCameraSelected(cameras[0]);
+    });
     setLastAnalysis();
   }
 
@@ -63,11 +63,14 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     final Directory extDir = await getApplicationDocumentsDirectory();
     final String dirPath = '${extDir.path}/LiquiQuali';
     // Caso queira deletar
-    //dirPath.deleteSync(recursive: true);
-    var filesList = Directory(dirPath).listSync();
-    setState(() {
-      imagePath = filesList.last.path;
-    });
+    //extDir.deleteSync(recursive: true);
+    // TODO: ordernar pela data de modificação
+    if (Directory(dirPath).existsSync()) {
+      var filesList = Directory(dirPath).listSync();
+      setState(() {
+        imagePath = filesList.last?.path ?? "";
+      });
+    }
   }
 
   @override
@@ -245,13 +248,13 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     }
     controller = CameraController(
       cameraDescription,
-      ResolutionPreset.medium,
+      ResolutionPreset.max,
     );
 
     controller.addListener(() {
       if (mounted) setState(() {});
       if (controller.value.hasError) {
-        showInSnackBar('Camera error ${controller.value.errorDescription}');
+        showInSnackBar('Erro na câmera: ${controller.value.errorDescription}');
       }
     });
 
@@ -276,27 +279,16 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
 
         image.Image finalImage = await ImageHelper.getImage(filePath);
 
-        for (var i = 0; i < finalImage.width; i++) {
-          for (var j = 0; j < finalImage.height; j++) {
-            var color = Color(finalImage.getPixelSafe(i, j));
-            if (color.computeLuminance() > 0 && color.computeLuminance() < 0.25) {
-              finalImage.setPixelSafe(i, j, Colors.red.value);
-            } else if (color.computeLuminance() >= 0.25 && color.computeLuminance() < 0.5) {
-              finalImage.setPixelSafe(i, j, Colors.black.value);
-            } else if (color.computeLuminance() >= 0.5 && color.computeLuminance() < 0.75) {
-              finalImage.setPixelSafe(i, j, Colors.blue.value);
-            } else {
-              finalImage.setPixelSafe(i, j, Colors.green.value);
-            }
-          }
-        }
+        var turbidity = Turbidity.getTurbidity(finalImage);
 
-        await ImageHelper.saveImage(finalImage, imagePath)
-            .then((String newPath) async {
-          setState(() {
-            imagePath = newPath;
-          });
-        });
+        showInSnackBar(turbidity.toString());
+
+        // await ImageHelper.saveImage(finalImage, imagePath)
+        //     .then((String newPath) async {
+        //   setState(() {
+        //     imagePath = newPath;
+        //   });
+        // });
       }
     });
   }
@@ -306,7 +298,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
       showInSnackBar('Erro: selecione uma câmera antes.');
       return null;
     }
-    
+
     final Directory extDir = await getApplicationDocumentsDirectory();
     final String dirPath = '${extDir.path}/LiquiQuali';
     bool exist = await File(dirPath).exists();
