@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:exif/exif.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
@@ -248,7 +249,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     }
     controller = CameraController(
       cameraDescription,
-      ResolutionPreset.max,
+      ResolutionPreset.medium,
     );
 
     controller.addListener(() {
@@ -277,9 +278,12 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
         });
         if (filePath == null) return;
 
-        image.Image finalImage = await ImageHelper.getImage(filePath);
+        var finalImage = await ImageHelper.getImage(filePath);
+        var exifTags = await readExifFromBytes(File(filePath).readAsBytesSync());
+        var exposureTime = ImageHelper.getExposureTime(exifTags);
+        var iso = ImageHelper.getIso(exifTags);
 
-        var turbidity = Turbidity.getTurbidity(finalImage);
+        var turbidity = Turbidity.getTurbidity(finalImage, exposureTime: exposureTime, isoSpeed: iso);
 
         showInSnackBar(turbidity.toString());
 

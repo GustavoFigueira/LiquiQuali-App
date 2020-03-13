@@ -1,9 +1,9 @@
 import 'dart:math';
 import 'package:flutter/cupertino.dart';
-import 'package:image/image.dart' as image;
+import 'package:image/image.dart' as img;
 
 class Turbidity {
-  static double getRemoteSensingReflectance(image.Image image, double exposureTime, double isoSpeed) {
+  static double getRemoteSensingReflectance(img.Image image, double exposureTime, double isoSpeed) {
     var rrs = 0.0;
 
     var waterRadiance = 0.0;
@@ -21,7 +21,7 @@ class Turbidity {
     return rrs;
   }
 
-  static double getRelativeRadiance(image.Image image, double exposureTime, double isoSpeed) {
+  static double getRelativeRadiance(img.Image image, double exposureTime, double isoSpeed) {
     var radiance = 0.0;
 
     var lightSpeed = exposureTime * isoSpeed;
@@ -31,14 +31,12 @@ class Turbidity {
     for (var i = 0; i < image.width; i++) {
       for (var j = 0; j < image.height; j++) {
         var pixel = image.getPixelSafe(i, j);
-
         var pixelColor = Color(pixel);
         // Relative Radiance Formula 1
         // radiance += (pixel.Red / lightSpeed);
 
         // Relative Radiance Formula 2
         radiance += ((0.2126 * pixelColor.red) + (0.7152 * pixelColor.green) + (0.0722 * pixelColor.blue)) / lightSpeed;
-
         // Normalização do RGB
         // r' = r / r+g+b; b' = b/+r+g+b... etc
       }
@@ -49,7 +47,7 @@ class Turbidity {
     return radiance;
   }
 
-  static double getTurbidity(image.Image image,
+  static double getTurbidity(img.Image image,
       {double exposureTime = 0, double isoSpeed = 1}) {
     double turbity = 0;
 
