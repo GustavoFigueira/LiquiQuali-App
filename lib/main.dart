@@ -6,6 +6,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as image;
+import 'package:torch/torch.dart';
 
 import 'helpers/turbidity.dart';
 import 'helpers/utils.dart';
@@ -36,7 +37,8 @@ void logError(String code, String message) =>
 class _CameraExampleHomeState extends State<CameraExampleHome>
     with WidgetsBindingObserver {
   CameraController controller;
-  String imagePath;
+  String originalImagePath;
+  String flashImagePath;
   CameraLensDirection currentCamera;
   final PermissionHandler _permissionHandler = PermissionHandler();
 
@@ -69,7 +71,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     if (Directory(dirPath).existsSync()) {
       var filesList = Directory(dirPath).listSync();
       setState(() {
-        imagePath = filesList.last?.path ?? "";
+        originalImagePath = filesList.last?.path ?? "";
       });
     }
   }
@@ -178,7 +180,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            imagePath == null
+            originalImagePath == null
                 ? Container()
                 : GestureDetector(
                     child: Container(
@@ -188,13 +190,13 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
                       width: 40,
                       color: Colors.black54,
                       child: Image(
-                        image: FileImage(File(imagePath)),
+                        image: FileImage(File(originalImagePath)),
                         fit: BoxFit.fitWidth,
                       ),
                     ),
                     onTap: () =>
                         Navigator.push(context, MaterialPageRoute(builder: (_) {
-                      return PreviewPage(imagePath);
+                      return PreviewPage(originalImagePath);
                     })),
                   )
           ],
@@ -274,25 +276,46 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     takePicture().then((String filePath) async {
       if (mounted) {
         setState(() {
-          imagePath = filePath;
+          originalImagePath = filePath;
         });
         if (filePath == null) return;
 
+        // Analisa a turbidez
         var finalImage = await ImageHelper.getImage(filePath);
-        var exifTags = await readExifFromBytes(File(filePath).readAsBytesSync());
+        var exifTags =
+            await readExifFromBytes(File(filePath).readAsBytesSync());
         var exposureTime = ImageHelper.getExposureTime(exifTags);
         var iso = ImageHelper.getIso(exifTags);
 
-        var turbidity = Turbidity.getTurbidity(finalImage, exposureTime: exposureTime, isoSpeed: iso);
+        var turbidity = Turbidity.getTurbidity(finalImage,
+            exposureTime: exposureTime, isoSpeed: iso);
 
-        showInSnackBar(turbidity.toString());
+        // Ativa o flash
+        bool hasTorch = await Torch.hasTorch;
+        Torch.flash(Duration(milliseconds: 300));
 
-        // await ImageHelper.saveImage(finalImage, imagePath)
-        //     .then((String newPath) async {
-        //   setState(() {
-        //     imagePath = newPath;
-        //   });
-        // });
+        takePicture().then((String _flashImagepath) async {
+          if (mounted) {
+            setState(() {
+              flashImagePath = _flashImagepath;
+            });
+            if (_flashImagepath == null) return;
+            
+            var flashImage = await ImageHelper.getImage(_flashImagepath);
+
+            finalImage =
+                ImageHelper.getImageSubtraction(finalImage, flashImage);
+
+            await ImageHelper.saveImage(finalImage, flashImagePath)
+                .then((String newPath) async {
+              setState(() {
+                originalImagePath = newPath;
+              });
+            });
+          }
+        });
+
+        showInSnackBar("$turbidity - ${Turbidity.getNTURange(turbidity)}");
       }
     });
   }

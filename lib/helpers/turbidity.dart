@@ -14,9 +14,7 @@ class Turbidity {
 
     // Remote Sensing Reflectance Formula
     rrs = (waterRadiance - (0.028 * skyRadiance)) / (pi / 0.18) * cardRadiance;
-
-    //if (rrs > 1)
-    //    rrs = rrs / 100;
+    //rrs = waterRadiance;
 
     return rrs;
   }
@@ -30,15 +28,15 @@ class Turbidity {
 
     for (var i = 0; i < image.width; i++) {
       for (var j = 0; j < image.height; j++) {
+
         var pixel = image.getPixelSafe(i, j);
         var pixelColor = Color(pixel);
+
         // Relative Radiance Formula 1
-        // radiance += (pixel.Red / lightSpeed);
+        radiance += (pixelColor.red / lightSpeed);
 
         // Relative Radiance Formula 2
-        radiance += ((0.2126 * pixelColor.red) + (0.7152 * pixelColor.green) + (0.0722 * pixelColor.blue)) / lightSpeed;
-        // Normalização do RGB
-        // r' = r / r+g+b; b' = b/+r+g+b... etc
+        //radiance += ((0.2126 * pixelColor.red) + (0.7152 * pixelColor.green) + (0.0722 * pixelColor.blue)) / lightSpeed;
       }
     }
 
@@ -49,7 +47,7 @@ class Turbidity {
 
   static double getTurbidity(img.Image image,
       {double exposureTime = 0, double isoSpeed = 1}) {
-    double turbity = 0;
+    double turbidity = 0;
 
     // Remote Sensing Reflectance
     double rrs = 0;
@@ -57,9 +55,10 @@ class Turbidity {
     rrs = getRemoteSensingReflectance(image, exposureTime, isoSpeed);
 
     // Turbidity Formula
-    turbity = (22.57 * rrs) / (0.044 - rrs);
-
-    return turbity.abs();
+    //turbidity = (22.57 * rrs) / (0.044 - rrs);
+    turbidity = (27.7 * rrs) / (0.05 - rrs);
+    
+    return turbidity.abs();
   }
 
   static String getNTURange(double ntu) {

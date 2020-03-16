@@ -15,8 +15,9 @@ dependencies:
   path_provider:
   permission_handler:
   shared_preferences:
-  exif: 
-  
+  exif:
+  torch: ^0.1.1
+
 dev_dependencies:
    flutter_test:
     sdk: flutter
