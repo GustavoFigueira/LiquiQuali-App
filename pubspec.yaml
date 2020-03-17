@@ -16,7 +16,8 @@ dependencies:
   permission_handler:
   shared_preferences:
   exif:
-  torch: ^0.1.1
+  fflashlight:
+    path: ./packages/fflashlight
 
 dev_dependencies:
    flutter_test:

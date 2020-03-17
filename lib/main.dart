@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:exif/exif.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as image;
-import 'package:torch/torch.dart';
+import 'package:fflashlight/fflashlight.dart';
 
 import 'helpers/turbidity.dart';
 import 'helpers/utils.dart';
@@ -36,21 +37,13 @@ void logError(String code, String message) =>
 
 class _CameraExampleHomeState extends State<CameraExampleHome>
     with WidgetsBindingObserver {
-  CameraController controller;
+  CameraController _controller;
   String originalImagePath;
   String flashImagePath;
   CameraLensDirection currentCamera;
   final PermissionHandler _permissionHandler = PermissionHandler();
 
-  Future<void> requestPermissions(List<PermissionGroup> permissions,
-      {Function onPermissionDenied}) async {
-    var result = await _permissionHandler.requestPermissions(permissions);
-    for (PermissionGroup permission in permissions) {
-      if (result[permission] != PermissionStatus.granted) {
-        onPermissionDenied();
-      }
-    }
-  }
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -60,6 +53,16 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
       onNewCameraSelected(cameras[0]);
     });
     setLastAnalysis();
+  }
+
+  Future<void> requestPermissions(List<PermissionGroup> permissions,
+      {Function onPermissionDenied}) async {
+    var result = await _permissionHandler.requestPermissions(permissions);
+    for (PermissionGroup permission in permissions) {
+      if (result[permission] != PermissionStatus.granted) {
+        onPermissionDenied();
+      }
+    }
   }
 
   Future<void> setLastAnalysis() async {
@@ -84,19 +87,17 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (controller == null || !controller.value.isInitialized) {
+    if (_controller == null || !_controller.value.isInitialized) {
       return;
     }
     if (state == AppLifecycleState.inactive) {
-      controller?.dispose();
+      _controller?.dispose();
     } else if (state == AppLifecycleState.resumed) {
-      if (controller != null) {
-        onNewCameraSelected(controller.description);
+      if (_controller != null) {
+        onNewCameraSelected(_controller.description);
       }
     }
   }
-
-  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   Widget build(BuildContext context) {
@@ -141,7 +142,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
 
   /// Display the preview from the camera (or a message if the preview is not available).
   Widget _cameraPreviewWidget() {
-    if (controller == null || !controller.value.isInitialized) {
+    if (_controller == null || !_controller.value.isInitialized) {
       return const Text(
         'Escolha uma câmera',
         style: TextStyle(
@@ -153,17 +154,17 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     } else {
       final size = MediaQuery.of(context).size;
 
-      if (!controller.value.isInitialized) {
+      if (!_controller.value.isInitialized) {
         return Container();
       }
       return ClipRect(
         child: Container(
           child: Transform.scale(
-            scale: controller.value.aspectRatio / size.aspectRatio,
+            scale: _controller.value.aspectRatio / size.aspectRatio,
             child: Center(
               child: AspectRatio(
-                aspectRatio: controller.value.aspectRatio,
-                child: CameraPreview(controller),
+                aspectRatio: _controller.value.aspectRatio,
+                child: CameraPreview(_controller),
               ),
             ),
           ),
@@ -220,11 +221,12 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
             child: RadioListTile<CameraDescription>(
               title: Icon(getCameraLensIcon(cameraDescription.lensDirection),
                   color: Colors.white),
-              groupValue: controller?.description,
+              groupValue: _controller?.description,
               value: cameraDescription,
-              onChanged: controller != null && controller.value.isRecordingVideo
-                  ? null
-                  : onNewCameraSelected,
+              onChanged:
+                  _controller != null && _controller.value.isRecordingVideo
+                      ? null
+                      : onNewCameraSelected,
             ),
           ),
         );
@@ -246,23 +248,23 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
   }
 
   void onNewCameraSelected(CameraDescription cameraDescription) async {
-    if (controller != null) {
-      await controller.dispose();
+    if (_controller != null) {
+      await _controller.dispose();
     }
-    controller = CameraController(
+    _controller = CameraController(
       cameraDescription,
       ResolutionPreset.medium,
     );
 
-    controller.addListener(() {
+    _controller.addListener(() {
       if (mounted) setState(() {});
-      if (controller.value.hasError) {
-        showInSnackBar('Erro na câmera: ${controller.value.errorDescription}');
+      if (_controller.value.hasError) {
+        showInSnackBar('Erro na câmera: ${_controller.value.errorDescription}');
       }
     });
 
     try {
-      await controller.initialize();
+      await _controller.initialize();
     } on CameraException catch (e) {
       _showCameraException(e);
     }
@@ -291,29 +293,33 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
             exposureTime: exposureTime, isoSpeed: iso);
 
         // Ativa o flash
-        bool hasTorch = await Torch.hasTorch;
-        Torch.flash(Duration(milliseconds: 300));
+        //bool hasFlash = await Flashlight.hasFlashlight;
+        //Torch.flash(Duration(milliseconds: 300));
+        var hasFlashlight = await Fflashlight.hasFlashlight;
+        await Fflashlight.flash(Duration(milliseconds: 300));
 
-        takePicture().then((String _flashImagepath) async {
-          if (mounted) {
-            setState(() {
-              flashImagePath = _flashImagepath;
-            });
-            if (_flashImagepath == null) return;
-            
-            var flashImage = await ImageHelper.getImage(_flashImagepath);
-
-            finalImage =
-                ImageHelper.getImageSubtraction(finalImage, flashImage);
-
-            await ImageHelper.saveImage(finalImage, flashImagePath)
-                .then((String newPath) async {
+        if (hasFlashlight) {
+          takePicture().then((String _flashImagepath) async {
+            if (mounted) {
               setState(() {
-                originalImagePath = newPath;
+                flashImagePath = _flashImagepath;
               });
-            });
-          }
-        });
+              if (_flashImagepath == null) return;
+
+              var flashImage = await ImageHelper.getImage(_flashImagepath);
+
+              finalImage =
+                  ImageHelper.getImageSubtraction(finalImage, flashImage);
+
+              await ImageHelper.saveImage(finalImage, flashImagePath)
+                  .then((String newPath) async {
+                setState(() {
+                  originalImagePath = newPath;
+                });
+              });
+            }
+          });
+        }
 
         showInSnackBar("$turbidity - ${Turbidity.getNTURange(turbidity)}");
       }
@@ -321,7 +327,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
   }
 
   Future<String> takePicture() async {
-    if (!controller.value.isInitialized) {
+    if (!_controller.value.isInitialized) {
       showInSnackBar('Erro: selecione uma câmera antes.');
       return null;
     }
@@ -335,13 +341,13 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
 
     final String filePath = '$dirPath/${timestamp()}.png';
 
-    if (controller.value.isTakingPicture) {
+    if (_controller.value.isTakingPicture) {
       // A capture is already pending, do nothing.
       return null;
     }
 
     try {
-      await controller.takePicture(filePath);
+      await _controller.takePicture(filePath);
     } on CameraException catch (e) {
       _showCameraException(e);
       return null;
