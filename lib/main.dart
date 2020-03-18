@@ -1,21 +1,22 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:exif/exif.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:image/image.dart' as image;
+import 'package:lamp/lamp.dart';
 
 import 'helpers/turbidity.dart';
 import 'helpers/utils.dart';
 import 'pages/preview_page.dart';
 
-class CameraExampleHome extends StatefulWidget {
+class MainCamera extends StatefulWidget {
   @override
-  _CameraExampleHomeState createState() {
-    return _CameraExampleHomeState();
+  _MainCameraState createState() {
+    return _MainCameraState();
   }
 }
 
@@ -31,18 +32,17 @@ IconData getCameraLensIcon(CameraLensDirection direction) {
   throw ArgumentError('Direção da câmera desconhecida.');
 }
 
-void logError(String code, String message) =>
-    print('Error: $code\nError Message: $message');
-
-class _CameraExampleHomeState extends State<CameraExampleHome>
-    with WidgetsBindingObserver {
+class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
   CameraController _controller;
   String originalImagePath;
   String flashImagePath;
   CameraLensDirection currentCamera;
   final PermissionHandler _permissionHandler = PermissionHandler();
-
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  bool _hasFlash = false;
+  bool _isOn = false;
+  double _intensity = 1.0;
 
   @override
   void initState() {
@@ -52,6 +52,15 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
       onNewCameraSelected(cameras[0]);
     });
     setLastAnalysis();
+    initPlatformState();
+  }
+
+  Future<void> initPlatformState() async {
+    bool hasFlash = await Lamp.hasLamp;
+    print("Device has flash ? $hasFlash");
+    setState(() {
+      _hasFlash = hasFlash;
+    });
   }
 
   Future<void> requestPermissions(List<PermissionGroup> permissions,
@@ -76,6 +85,15 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
         originalImagePath = filesList.last?.path ?? "";
       });
     }
+  }
+
+  Future _turnFlash() async {
+    _isOn ? Lamp.turnOff() : Lamp.turnOn(intensity: _intensity);
+    var f = await Lamp.hasLamp;
+    setState(() {
+      _hasFlash = f;
+      _isOn = !_isOn;
+    });
   }
 
   @override
@@ -242,10 +260,6 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
 
   String timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
 
-  void showInSnackBar(String message) {
-    _scaffoldKey.currentState.showSnackBar(SnackBar(content: Text(message)));
-  }
-
   void onNewCameraSelected(CameraDescription cameraDescription) async {
     if (_controller != null) {
       await _controller.dispose();
@@ -258,7 +272,8 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     _controller.addListener(() {
       if (mounted) setState(() {});
       if (_controller.value.hasError) {
-        showInSnackBar('Erro na câmera: ${_controller.value.errorDescription}');
+        Utils.showInSnackBar(_scaffoldKey,
+            'Erro na câmera: ${_controller.value.errorDescription}');
       }
     });
 
@@ -292,10 +307,8 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
             exposureTime: exposureTime, isoSpeed: iso);
 
         // Ativa o flash
-        bool hasFlashlight = true;
-        //Torch.flash(Duration(milliseconds: 300));
-
-        if (hasFlashlight) {
+        if (_hasFlash) {
+          _turnFlash();
           takePicture().then((String _flashImagepath) async {
             if (mounted) {
               setState(() {
@@ -318,14 +331,15 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
           });
         }
 
-        showInSnackBar("$turbidity - ${Turbidity.getNTURange(turbidity)}");
+        Utils.showInSnackBar(
+            _scaffoldKey, "$turbidity - ${Turbidity.getNTURange(turbidity)}");
       }
     });
   }
 
   Future<String> takePicture() async {
     if (!_controller.value.isInitialized) {
-      showInSnackBar('Erro: selecione uma câmera antes.');
+      Utils.showInSnackBar(_scaffoldKey, 'Erro: selecione uma câmera antes.');
       return null;
     }
 
@@ -354,8 +368,8 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
   }
 
   void _showCameraException(CameraException e) {
-    logError(e.code, e.description);
-    showInSnackBar('Error: ${e.code}\n${e.description}');
+    Utils.logError(e.code, e.description);
+    Utils.showInSnackBar(_scaffoldKey, 'Error: ${e.code}\n${e.description}');
   }
 }
 
@@ -364,7 +378,7 @@ class CameraApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: CameraExampleHome(),
+      home: MainCamera(),
     );
   }
 }
@@ -376,7 +390,7 @@ Future<void> main() async {
     WidgetsFlutterBinding.ensureInitialized();
     cameras = await availableCameras();
   } on CameraException catch (e) {
-    logError(e.code, e.description);
+    Utils.logError(e.code, e.description);
   }
   runApp(CameraApp());
 }

@@ -78,13 +78,6 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "1.0.2"
-  fflashlight:
-    dependency: "direct main"
-    description:
-      path: "packages\\fflashlight"
-      relative: true
-    source: path
-    version: "0.0.1"
   flutter:
     dependency: "direct main"
     description: flutter
@@ -107,6 +100,13 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "2.1.4"
+  lamp:
+    dependency: "direct main"
+    description:
+      name: lamp
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "0.0.6"
   matcher:
     dependency: transitive
     description:

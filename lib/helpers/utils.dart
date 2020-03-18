@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'package:exif/exif.dart';
+import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 import 'package:flutter/painting.dart';
 
@@ -55,7 +56,8 @@ class ImageHelper {
     int _width = min(originalImage.width, flashImage.width);
     int _height = min(originalImage.height, flashImage.height);
 
-    List<List<int>> differences = new List.generate(_width, (_) => new List(_height));
+    List<List<int>> differences =
+        new List.generate(_width, (_) => new List(_height));
     int maxDifference = 0;
 
     for (int x = 0; x < _width; x++) {
@@ -82,5 +84,14 @@ class ImageHelper {
     }
 
     return finalImage;
+  }
+}
+
+class Utils {
+  static void logError(String code, String message) =>
+      print('Error: $code\nError Message: $message');
+
+  static void showInSnackBar(GlobalKey<ScaffoldState> _scaffoldKey, String message) {
+    _scaffoldKey.currentState.showSnackBar(SnackBar(content: Text(message)));
   }
 }
