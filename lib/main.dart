@@ -7,7 +7,6 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as image;
-import 'package:fflashlight/fflashlight.dart';
 
 import 'helpers/turbidity.dart';
 import 'helpers/utils.dart';
@@ -293,10 +292,8 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
             exposureTime: exposureTime, isoSpeed: iso);
 
         // Ativa o flash
-        //bool hasFlash = await Flashlight.hasFlashlight;
+        bool hasFlashlight = true;
         //Torch.flash(Duration(milliseconds: 300));
-        var hasFlashlight = await Fflashlight.hasFlashlight;
-        await Fflashlight.flash(Duration(milliseconds: 300));
 
         if (hasFlashlight) {
           takePicture().then((String _flashImagepath) async {
