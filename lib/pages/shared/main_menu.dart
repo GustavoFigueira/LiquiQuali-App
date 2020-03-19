@@ -22,10 +22,10 @@ class _MainMenuDrawerState extends State<MainMenuDrawer> {
           padding: EdgeInsets.all(20),
           constraints: BoxConstraints.expand(height: 100),
           alignment: Alignment.center,
-          child: Image.asset(
-            "assets/images/logo.png",
-            fit: BoxFit.cover,
-          ),
+          // child: Image.asset(
+          //   "assets/images/logo.png",
+          //   fit: BoxFit.cover,
+          // ),
         ),
         Container(
           margin: EdgeInsets.symmetric(vertical: 10),
@@ -35,12 +35,9 @@ class _MainMenuDrawerState extends State<MainMenuDrawer> {
             mainAxisSize: MainAxisSize.max,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              linkMenuDrawer(context, 'Linhas', () {
+              linkMenuDrawer(context, 'Análises', () {
                 Navigator.pushNamed(context, '/lines');
-              }, icon: Icons.linear_scale),
-              linkMenuDrawer(context, 'Companhias', () {
-                Navigator.pushNamed(context, '/companies');
-              }, icon: Icons.directions_bus),
+              }, icon: Icons.settings_backup_restore),
               linkMenuDrawer(context, 'Avaliar', () {
                 //LaunchReview.launch();
               }, icon: Icons.star, color: Color(0xffFFBF00)),

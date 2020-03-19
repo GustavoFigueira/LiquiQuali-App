@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as img;
 import 'package:animator/animator.dart';
 
+import 'helpers/image_processing.dart';
 import 'helpers/turbidity.dart';
 import 'helpers/utils.dart';
 import 'pages/preview_page.dart';
@@ -37,13 +38,13 @@ IconData getCameraLensIcon(CameraLensDirection direction) {
 class _MainCameraState extends State<MainCamera>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   CameraController _controller;
+  CameraLensDirection currentCamera;
   String originalImagePath;
   String flashImagePath;
-  CameraLensDirection currentCamera;
+  bool _hasTorch = false;
+  String timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
   final PermissionHandler _permissionHandler = PermissionHandler();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  bool _hasTorch = false;
-
   // TODO: Componentizar esse scanner
   double _scannerSize = 100;
 
@@ -55,6 +56,40 @@ class _MainCameraState extends State<MainCamera>
       onNewCameraSelected(cameras[0]);
     });
     setLastAnalysis();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_controller == null || !_controller.value.isInitialized) {
+      return;
+    }
+    if (state == AppLifecycleState.inactive) {
+      _controller?.dispose();
+    } else if (state == AppLifecycleState.resumed) {
+      if (_controller != null) {
+        onNewCameraSelected(_controller.description);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+        key: _scaffoldKey,
+        drawer: Drawer(child: MainMenuDrawer()),
+        body: Stack(
+          children: <Widget>[
+            _cameraPreviewWidget(),
+            _customAppBar(),
+            _cameraActions(),
+          ],
+        ));
   }
 
   Future<void> deviceHasTorch() async {
@@ -93,50 +128,19 @@ class _MainCameraState extends State<MainCamera>
     }
   }
 
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_controller == null || !_controller.value.isInitialized) {
-      return;
-    }
-    if (state == AppLifecycleState.inactive) {
-      _controller?.dispose();
-    } else if (state == AppLifecycleState.resumed) {
-      if (_controller != null) {
-        onNewCameraSelected(_controller.description);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-        key: _scaffoldKey,
-        drawer: Drawer(child: MainMenuDrawer()),
-        body: Stack(
-          children: <Widget>[
-            _cameraPreviewWidget(),
-            _customAppBar(),
-            _cameraTogglesRowWidget(),
-          ],
-        ));
-  }
-
   Widget _takePhotoButton() {
-    return Container(
-        margin: EdgeInsets.symmetric(vertical: 30),
-        child: RaisedButton.icon(
-            elevation: 4.0,
-            icon: Icon(Icons.photo_camera, color: Colors.white),
-            color: Colors.black54,
-            label: Text("Analisar",
-                style: TextStyle(color: Colors.white, fontSize: 16.0)),
-            onPressed: () => onTakePictureButtonPressed()));
+    return Positioned(
+      bottom: 0,
+      child: Container(
+          margin: EdgeInsets.symmetric(vertical: 30),
+          child: RaisedButton.icon(
+              elevation: 4.0,
+              icon: Icon(Icons.photo_camera, color: Colors.white),
+              color: Colors.black54,
+              label: Text("Analisar",
+                  style: TextStyle(color: Colors.white, fontSize: 16.0)),
+              onPressed: () => onTakePictureButtonPressed())),
+    );
   }
 
   Widget _customAppBar() {
@@ -187,7 +191,7 @@ class _MainCameraState extends State<MainCamera>
               ),
             )),
             Positioned.fill(
-              child: Align(
+                child: Align(
               alignment: Alignment.center,
               child: Stack(
                 children: <Widget>[
@@ -199,7 +203,9 @@ class _MainCameraState extends State<MainCamera>
                           border:
                               Border.all(color: Colors.blueAccent, width: 2))),
                   Animator(
-                    tween: Tween<double>(begin: 0, end: MediaQuery.of(context).size.height / 2.6),
+                    tween: Tween<double>(
+                        begin: 0,
+                        end: MediaQuery.of(context).size.height / 2.6),
                     duration: Duration(seconds: 1),
                     cycles: 0,
                     builder: (anim) => Positioned(
@@ -225,74 +231,38 @@ class _MainCameraState extends State<MainCamera>
 
   /// Display the thumbnail of the captured image or video.
   Widget _thumbnailWidget() {
-    return Expanded(
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            originalImagePath == null
-                ? Container()
-                : GestureDetector(
-                    child: Container(
-                      margin:
-                          EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-                      height: 60,
-                      width: 40,
-                      color: Colors.black54,
-                      child: Image(
-                        image: FileImage(File(originalImagePath)),
-                        fit: BoxFit.fitWidth,
-                      ),
-                    ),
-                    onTap: () =>
-                        Navigator.push(context, MaterialPageRoute(builder: (_) {
-                      return PreviewPage(originalImagePath);
-                    })),
-                  )
-          ],
+    return Positioned(
+      bottom: 0,
+      right: 0,
+      child: GestureDetector(
+        child: Container(
+          margin: EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+          height: 60,
+          width: 40,
+          color: Colors.black54,
+          child: Image(
+            image: FileImage(File(originalImagePath)),
+            fit: BoxFit.fitWidth,
+          ),
         ),
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) {
+          return PreviewPage(originalImagePath);
+        })),
       ),
     );
   }
 
-  Widget _cameraTogglesRowWidget() {
-    final List<Widget> toggles = <Widget>[];
-
-    // TODO: trocar sizedebox por container
-
-    // if (cameras.isEmpty) {
-    //   return const Text('Nenhuma câmera encontrada!');
-    // } else {
-    //   for (CameraDescription cameraDescription in cameras) {
-    //     toggles.add(
-    //       SizedBox(
-    //         width: 90.0,
-    //         child: RadioListTile<CameraDescription>(
-    //           title: Icon(getCameraLensIcon(cameraDescription.lensDirection),
-    //               color: Colors.white),
-    //           groupValue: _controller?.description,
-    //           value: cameraDescription,
-    //           onChanged:
-    //               _controller != null && _controller.value.isRecordingVideo
-    //                   ? null
-    //                   : onNewCameraSelected,
-    //         ),
-    //       ),
-    //     );
-    //   }
-
-    // }
-    toggles.add(_takePhotoButton());
-    toggles.add(_thumbnailWidget());
-
+  Widget _cameraActions() {
     return Positioned(
-        child: Column(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: <Widget>[Row(children: toggles)]));
+        bottom: 0,
+        left: 0,
+        width: MediaQuery.of(context).size.width,
+        height: MediaQuery.of(context).size.height,
+        child: Stack(
+          alignment: Alignment.center,
+          children: <Widget>[_takePhotoButton(), _thumbnailWidget()],
+        ));
   }
-
-  String timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
 
   void onNewCameraSelected(CameraDescription cameraDescription) async {
     if (_controller != null) {

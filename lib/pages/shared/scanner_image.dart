@@ -3,11 +3,9 @@ import 'package:flutter/widgets.dart';
 
 class _ScannerBarAnimation extends StatelessWidget {
   @override
-  Widget build(BuildContext context) {
-    
+  Widget build(BuildContext context) { 
     return null;
   }
-  
 }
 
 class _ScannerContentView extends StatelessWidget {

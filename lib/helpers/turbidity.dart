@@ -61,6 +61,12 @@ class Turbidity {
     return turbidity.abs();
   }
 
+  static int getDarkAreasAmount(img.Image image) {
+    var dirtyAmount = 0;
+
+    return dirtyAmount;
+  }
+
   static String getNTURange(double ntu) {
     var range = "";
 
