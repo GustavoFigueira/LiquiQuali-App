@@ -85,4 +85,23 @@ class ImageHelper {
 
     return finalImage;
   }
+
+  static double darksAmountPercentage(img.Image subtractionImage) {
+    var darksAmountPercentage = 0.0;
+    var darksAmount = 0.0;
+
+    for (int x = 0; x < subtractionImage.width; x++) {
+      for (int y = 0; y < subtractionImage.height; y++) {
+        if (Color(subtractionImage.getPixelSafe(x, y)).computeLuminance() <
+            0.5) {
+          darksAmount++;
+        }
+      }
+    }
+
+    int pixelsTotal = subtractionImage.width * subtractionImage.height;
+    darksAmountPercentage = (darksAmount * 100) / pixelsTotal;
+    
+    return darksAmountPercentage;
+  }
 }

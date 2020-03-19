@@ -46,6 +46,7 @@ class _MainCameraState extends State<MainCamera>
   String timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
   final PermissionHandler _permissionHandler = PermissionHandler();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  double scannerSize = 200;
 
   @override
   void initState() {
@@ -83,13 +84,16 @@ class _MainCameraState extends State<MainCamera>
         key: _scaffoldKey,
         drawer:
             isProcessing ? SizedBox.shrink() : Drawer(child: MainMenuDrawer()),
-        body: Stack(
-          children: <Widget>[
-            _cameraPreviewWidget(),
-            _customAppBar(),
-            _cameraActions(),
-          ],
-        ));
+        body: Container(
+            height: MediaQuery.of(context).size.height,
+            width: MediaQuery.of(context).size.width,
+            child: Stack(
+              children: <Widget>[
+                _cameraPreviewWidget(),
+                _customAppBar(),
+                _cameraActions(),
+              ],
+            )));
   }
 
   Future<void> deviceHasFlash() async {
@@ -148,8 +152,7 @@ class _MainCameraState extends State<MainCamera>
   Widget _customAppBar() {
     return isProcessing
         ? SizedBox.shrink()
-        : Positioned(
-            child: AppBar(
+        : AppBar(
             centerTitle: true,
             title: Text("LiquiQuali",
                 style: TextStyle(
@@ -162,7 +165,7 @@ class _MainCameraState extends State<MainCamera>
                   ],
                 )),
             backgroundColor: Colors.transparent,
-          ));
+          );
   }
 
   Widget _processingWidget() {
@@ -170,8 +173,8 @@ class _MainCameraState extends State<MainCamera>
         child: Align(
             alignment: Alignment.center,
             child: Container(
-                width: MediaQuery.of(context).size.width / 1.3,
-                height: MediaQuery.of(context).size.width / 1.3,
+                width: scannerSize,
+                height: scannerSize,
                 child: Align(
                     alignment: Alignment.center,
                     child: Text('*ANALISANDO*\n Não mova seu dispositivo.',
@@ -224,8 +227,8 @@ class _MainCameraState extends State<MainCamera>
                     child: Stack(
                       children: <Widget>[
                         Container(
-                            width: MediaQuery.of(context).size.width / 1.3,
-                            height: MediaQuery.of(context).size.width / 1.3,
+                            width: scannerSize,
+                            height: scannerSize,
                             decoration: BoxDecoration(
                                 color: Colors.transparent,
                                 border: Border.all(
@@ -306,7 +309,10 @@ class _MainCameraState extends State<MainCamera>
         autoFocusMode: AutoFocusMode.continuous);
 
     _controller.addListener(() {
-      if (mounted) setState(() {});
+      if (mounted)
+        setState(() {
+          scannerSize = (MediaQuery.of(context).size.width / 1.3);
+        });
       if (_controller.value.hasError) {
         Utils.showInSnackBar(_scaffoldKey,
             'Erro na câmera: ${_controller.value.errorDescription}');
@@ -367,6 +373,8 @@ class _MainCameraState extends State<MainCamera>
               var finalImage =
                   ImageHelper.getImageSubtraction(originalImage, flashImage);
 
+              var darksAmount = ImageHelper.darksAmountPercentage(finalImage);
+
               await ImageHelper.saveImage(finalImage, flashImagePath)
                   .then((String newPath) async {
                 setState(() {
@@ -376,18 +384,26 @@ class _MainCameraState extends State<MainCamera>
 
               // TODO: trocar pela quantização de pixels pretos
               var turbidity = Turbidity.getTurbidity(finalImage,
-                  exposureTime: exposureTime, isoSpeed: iso);
+                  exposureTime: exposureTime,
+                  isoSpeed: iso,
+                  sampleSize: scannerSize.round());
 
+              // Apresenta a turbidez final
               Utils.showInSnackBar(_scaffoldKey,
                   "$turbidity - ${Turbidity.getNTURange(turbidity)}");
 
               setProcessingState(false);
             }
           });
-        } else {
+        }
+        // Caso o dispositivo não tenha flash
+        else {
           var turbidity = Turbidity.getTurbidity(originalImage,
-              exposureTime: exposureTime, isoSpeed: iso);
+              exposureTime: exposureTime,
+              isoSpeed: iso,
+              sampleSize: scannerSize.round());
 
+          // Apresenta a turbidez final
           Utils.showInSnackBar(
               _scaffoldKey, "$turbidity - ${Turbidity.getNTURange(turbidity)}");
 

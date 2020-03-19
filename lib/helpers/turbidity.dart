@@ -3,14 +3,14 @@ import 'package:flutter/cupertino.dart';
 import 'package:image/image.dart' as img;
 
 class Turbidity {
-  static double getRemoteSensingReflectance(img.Image image, double exposureTime, double isoSpeed) {
+  static double getRemoteSensingReflectance(img.Image image, double exposureTime, double isoSpeed, int sampleSize) {
     var rrs = 0.0;
 
     var waterRadiance = 0.0;
     var skyRadiance = 1;
     var cardRadiance = 0.18;
 
-    waterRadiance = getRelativeRadiance(image, exposureTime, isoSpeed);
+    waterRadiance = getRelativeRadiance(image, exposureTime, isoSpeed, sampleSize);
 
     // Remote Sensing Reflectance Formula
     rrs = (waterRadiance - (0.028 * skyRadiance)) / (pi / 0.18) * cardRadiance;
@@ -19,17 +19,31 @@ class Turbidity {
     return rrs;
   }
 
-  static double getRelativeRadiance(img.Image image, double exposureTime, double isoSpeed) {
+  static double getRelativeRadiance(img.Image image, double exposureTime, double isoSpeed, int sampleSize) {
     var radiance = 0.0;
 
     var lightSpeed = exposureTime * isoSpeed;
 
     if (lightSpeed == 0) lightSpeed = 1;
 
-    for (var i = 0; i < image.width; i++) {
-      for (var j = 0; j < image.height; j++) {
+    var width = image.width;
+    var height = image.height;
+    var indeX = 0;
+    var indexY = 0;
 
-        var pixel = image.getPixelSafe(i, j);
+    // Utiliza apenas o quadrado central da amostra.
+    // Caso seja 0, utiliza a imagem completa.
+    if (sampleSize > 0) {
+      width = sampleSize * 2;
+      height = sampleSize * 2;
+      indeX = sampleSize;
+      indexY = sampleSize;
+    }
+
+    for (indeX = 0; indeX < width; indeX++) {
+      for (indexY = 0; indexY < height; indexY++) {
+
+        var pixel = image.getPixelSafe(indeX, indexY);
         var pixelColor = Color(pixel);
 
         // Relative Radiance Formula 1
@@ -46,25 +60,19 @@ class Turbidity {
   }
 
   static double getTurbidity(img.Image image,
-      {double exposureTime = 0, double isoSpeed = 1}) {
+      {double exposureTime = 0, double isoSpeed = 1, int sampleSize = 0}) {
     double turbidity = 0;
 
     // Remote Sensing Reflectance
     double rrs = 0;
 
-    rrs = getRemoteSensingReflectance(image, exposureTime, isoSpeed);
+    rrs = getRemoteSensingReflectance(image, exposureTime, isoSpeed, sampleSize);
 
     // Turbidity Formula
     //turbidity = (22.57 * rrs) / (0.044 - rrs);
     turbidity = (27.7 * rrs) / (0.05 - rrs);
     
     return turbidity.abs();
-  }
-
-  static int getDarkAreasAmount(img.Image image) {
-    var dirtyAmount = 0;
-
-    return dirtyAmount;
   }
 
   static String getNTURange(double ntu) {
