@@ -41,7 +41,7 @@ class _MainCameraState extends State<MainCamera>
   CameraLensDirection currentCamera;
   String originalImagePath;
   String flashImagePath;
-  bool _hasTorch = false;
+  bool _hasFlash = false;
   String timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
   final PermissionHandler _permissionHandler = PermissionHandler();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -92,15 +92,15 @@ class _MainCameraState extends State<MainCamera>
         ));
   }
 
-  Future<void> deviceHasTorch() async {
-    bool hasTorch = false;
+  Future<void> deviceHasFlash() async {
+    bool hasFlash = false;
 
     if (_controller != null) {
-      hasTorch = await _controller.hasTorch;
+      hasFlash = await _controller.hasFlash;
     }
 
     setState(() {
-      _hasTorch = hasTorch;
+      _hasFlash = hasFlash;
     });
   }
 
@@ -234,7 +234,7 @@ class _MainCameraState extends State<MainCamera>
     return Positioned(
       bottom: 0,
       right: 0,
-      child: GestureDetector(
+      child: originalImagePath == null? Container() : GestureDetector(
         child: Container(
           margin: EdgeInsets.symmetric(horizontal: 15, vertical: 10),
           height: 60,
@@ -271,6 +271,7 @@ class _MainCameraState extends State<MainCamera>
     _controller = CameraController(
       cameraDescription,
       ResolutionPreset.medium,
+      autoFocusMode: AutoFocusMode.continuous
     );
 
     _controller.addListener(() {
@@ -293,8 +294,9 @@ class _MainCameraState extends State<MainCamera>
   }
 
   void onTakePictureButtonPressed() {
-    deviceHasTorch();
+    deviceHasFlash();
 
+     _controller.setFlash(mode: FlashMode.off);
     takePicture().then((String filePath) async {
       if (mounted) {
         setState(() {
@@ -310,11 +312,10 @@ class _MainCameraState extends State<MainCamera>
         var iso = ImageHelper.getIso(exifTags);
 
         // Ativa o flash
-        if (_hasTorch) {
-          _toggleTorch(true);
-
+        if (_hasFlash) {
+          _controller.setFlash(mode: FlashMode.alwaysFlash);
+          
           takePicture().then((String _flashImagepath) async {
-            _toggleTorch(false);
             if (mounted) {
               setState(() {
                 flashImagePath = _flashImagepath;
@@ -385,19 +386,6 @@ class _MainCameraState extends State<MainCamera>
   void _showCameraException(CameraException e) {
     Utils.logError(e.code, e.description);
     Utils.showInSnackBar(_scaffoldKey, 'Error: ${e.code}\n${e.description}');
-  }
-
-  /// Ativa/Inativa a Lanterna
-  Future<void> _toggleTorch(bool value) async {
-    if (_hasTorch) {
-      if (value) {
-        _controller.torchOn();
-      } else {
-        _controller.torchOff();
-      }
-    }
-
-    setState(() {});
   }
 }
 
