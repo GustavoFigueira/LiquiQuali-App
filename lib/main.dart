@@ -8,10 +8,12 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:image/image.dart' as img;
+import 'package:animator/animator.dart';
 
 import 'helpers/turbidity.dart';
 import 'helpers/utils.dart';
 import 'pages/preview_page.dart';
+import 'pages/shared/main_menu.dart';
 
 class MainCamera extends StatefulWidget {
   @override
@@ -43,8 +45,7 @@ class _MainCameraState extends State<MainCamera>
   bool _hasTorch = false;
 
   // TODO: Componentizar esse scanner
-  AnimationController _barScannerAnimationController;
-  Animation _barScannerPositionAnimation;
+  double _scannerSize = 100;
 
   @override
   void initState() {
@@ -54,12 +55,6 @@ class _MainCameraState extends State<MainCamera>
       onNewCameraSelected(cameras[0]);
     });
     setLastAnalysis();
-
-    _barScannerAnimationController =
-        AnimationController(vsync: this, duration: Duration(milliseconds: 999));
-    _barScannerPositionAnimation = Tween<double>(begin: 0, end: 100)
-        .animate(_barScannerAnimationController);
-    _changeScannerPosition();
   }
 
   Future<void> deviceHasTorch() async {
@@ -72,19 +67,6 @@ class _MainCameraState extends State<MainCamera>
     setState(() {
       _hasTorch = hasTorch;
     });
-  }
-
-  void _changeScannerPosition() async {
-    while (true) {
-      await new Future.delayed(const Duration(seconds: 1), () {
-        if (_barScannerAnimationController.status ==
-            AnimationStatus.completed) {
-          _barScannerAnimationController.reverse();
-        } else {
-          _barScannerAnimationController.forward();
-        }
-      });
-    }
   }
 
   Future<void> requestPermissions(List<PermissionGroup> permissions,
@@ -135,6 +117,7 @@ class _MainCameraState extends State<MainCamera>
   Widget build(BuildContext context) {
     return Scaffold(
         key: _scaffoldKey,
+        drawer: Drawer(child: MainMenuDrawer()),
         body: Stack(
           children: <Widget>[
             _cameraPreviewWidget(),
@@ -204,7 +187,7 @@ class _MainCameraState extends State<MainCamera>
               ),
             )),
             Positioned.fill(
-                child: Align(
+              child: Align(
               alignment: Alignment.center,
               child: Stack(
                 children: <Widget>[
@@ -215,19 +198,22 @@ class _MainCameraState extends State<MainCamera>
                           color: Colors.transparent,
                           border:
                               Border.all(color: Colors.blueAccent, width: 2))),
-                  AnimatedBuilder(
-                      animation: _barScannerPositionAnimation,
-                      builder: (context, child) => Positioned(
-                            top: _barScannerPositionAnimation.value,
-                            child: Align(
-                              alignment: Alignment.center,
-                              child: Container(
-                                height: 4,
-                                width: MediaQuery.of(context).size.width,
-                                color: Colors.greenAccent,
-                              ),
-                            ),
-                          ))
+                  Animator(
+                    tween: Tween<double>(begin: 0, end: MediaQuery.of(context).size.height / 2.6),
+                    duration: Duration(seconds: 1),
+                    cycles: 0,
+                    builder: (anim) => Positioned(
+                      top: anim.value,
+                      child: Align(
+                        alignment: Alignment.center,
+                        child: Container(
+                          height: 4,
+                          width: MediaQuery.of(context).size.width,
+                          color: Colors.greenAccent,
+                        ),
+                      ),
+                    ),
+                  )
                 ],
               ),
             ))

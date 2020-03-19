@@ -16,6 +16,7 @@ dependencies:
   permission_handler:
   shared_preferences:
   exif:
+  animator: ^1.0.0+5
 
 dev_dependencies:
    flutter_test:
