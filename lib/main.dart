@@ -7,7 +7,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:fflashlight/fflashlight.dart';
 
 import 'helpers/turbidity.dart';
 import 'helpers/utils.dart';
@@ -40,8 +39,7 @@ class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
   final PermissionHandler _permissionHandler = PermissionHandler();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  bool _hasFlashlight = false;
-  bool enableTorch = false;
+  bool _hasTorch = false;
 
   @override
   void initState() {
@@ -50,26 +48,18 @@ class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
     requestPermissions(<PermissionGroup>[PermissionGroup.camera]).then((bool) {
       onNewCameraSelected(cameras[0]);
     });
-    initPlatformState();
     setLastAnalysis();
   }
 
-  Future<void> initPlatformState() async {
-    bool hasFlashlight;
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    try {
-      hasFlashlight = await Fflashlight.hasFlashlight;
-    } on PlatformException {
-      hasFlashlight = false;
+  Future<void> deviceHasTorch() async {
+    bool hasTorch = false;
+
+    if (_controller != null) {
+      hasTorch = await _controller.hasTorch;
     }
 
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
     setState(() {
-      _hasFlashlight = hasFlashlight;
+      _hasTorch = hasTorch;
     });
   }
 
@@ -229,29 +219,30 @@ class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
 
     // TODO: trocar sizedebox por container
 
-    if (cameras.isEmpty) {
-      return const Text('Nenhuma câmera encontrada!');
-    } else {
-      for (CameraDescription cameraDescription in cameras) {
-        toggles.add(
-          SizedBox(
-            width: 90.0,
-            child: RadioListTile<CameraDescription>(
-              title: Icon(getCameraLensIcon(cameraDescription.lensDirection),
-                  color: Colors.white),
-              groupValue: _controller?.description,
-              value: cameraDescription,
-              onChanged:
-                  _controller != null && _controller.value.isRecordingVideo
-                      ? null
-                      : onNewCameraSelected,
-            ),
-          ),
-        );
-      }
+    // if (cameras.isEmpty) {
+    //   return const Text('Nenhuma câmera encontrada!');
+    // } else {
+    //   for (CameraDescription cameraDescription in cameras) {
+    //     toggles.add(
+    //       SizedBox(
+    //         width: 90.0,
+    //         child: RadioListTile<CameraDescription>(
+    //           title: Icon(getCameraLensIcon(cameraDescription.lensDirection),
+    //               color: Colors.white),
+    //           groupValue: _controller?.description,
+    //           value: cameraDescription,
+    //           onChanged:
+    //               _controller != null && _controller.value.isRecordingVideo
+    //                   ? null
+    //                   : onNewCameraSelected,
+    //         ),
+    //       ),
+    //     );
+    //   }
 
-      toggles.add(_thumbnailWidget());
-    }
+      
+    // }
+    toggles.add(_thumbnailWidget());
 
     return Positioned(
         child: Column(
@@ -290,6 +281,8 @@ class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
   }
 
   void onTakePictureButtonPressed() {
+    deviceHasTorch();
+
     takePicture().then((String filePath) async {
       if (mounted) {
         setState(() {
@@ -308,7 +301,7 @@ class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
             exposureTime: exposureTime, isoSpeed: iso);
 
         // Ativa o flash
-        if (_hasFlashlight) {
+        if (_hasTorch) {
 
           _toggleTorch(true);
           
@@ -376,19 +369,14 @@ class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
     Utils.showInSnackBar(_scaffoldKey, 'Error: ${e.code}\n${e.description}');
   }
 
-   /// Toggle Torch
+   /// Ativa/Inativa a Lanterna
   Future<void> _toggleTorch(bool value) async {
-    bool hasTorch = false;
 
-    if (_controller != null) {
-      hasTorch = await _controller.hasTorch;
-    }
-
-    if (hasTorch) {
-      enableTorch = value;
-      if (enableTorch) {
+    if (_hasTorch) {
+      if (value) {
         _controller.torchOn();
-      } else {
+      }
+      else {
         _controller.torchOff();
       }
     }

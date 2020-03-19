@@ -58,32 +58,23 @@ class ImageHelper {
 
     List<List<int>> differences =
         new List.generate(_width, (_) => new List(_height));
-    int maxDifference = 0;
 
     for (int x = 0; x < _width; x++) {
       for (int y = 0; y < _height; y++) {
         Color color1 = Color(originalImage.getPixelSafe(x, y));
         Color color2 = Color(flashImage.getPixelSafe(x, y));
 
-        differences[x][y] = (color1.red - color2.red) +
-            (color1.green - color2.green) +
-            (color1.blue - color2.blue);
-
-        if (differences[x][y] > maxDifference)
-          maxDifference = differences[x][y];
+        var pixelSubtraction = color2.value - color1.value;
+        differences[x][y] = pixelSubtraction.abs();
       }
     }
 
+    // Gera a imagem final
     img.Image finalImage = new img.Image(_width, _height);
-
     for (int x = 0; x < _width; x++) {
       for (int y = 0; y < _height; y++) {
-        var factor = maxDifference * differences[x][y];
-        if (factor == 0) {
-          factor = 1;
-        }
-        int clr = 255 - 255.0 ~/ factor;
-        finalImage.setPixel(x, y, Color.fromARGB(clr, clr, clr, clr).value);
+        var newColor = differences[x][y];
+        finalImage.setPixelSafe(x, y, newColor);
       }
     }
 

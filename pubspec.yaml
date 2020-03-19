@@ -17,9 +17,6 @@ dependencies:
   shared_preferences:
   exif:
 
-  fflashlight:
-    path: ../fflashlight
-
 dev_dependencies:
    flutter_test:
     sdk: flutter
