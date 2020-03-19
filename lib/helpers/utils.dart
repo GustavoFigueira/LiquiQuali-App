@@ -64,8 +64,13 @@ class ImageHelper {
         Color color1 = Color(originalImage.getPixelSafe(x, y));
         Color color2 = Color(flashImage.getPixelSafe(x, y));
 
-        var pixelSubtraction = color2.value - color1.value;
-        differences[x][y] = pixelSubtraction.abs();
+        var pixelSubtraction = Color.fromARGB(
+            255,
+            (color2.red - color1.red).abs(),
+            (color2.green - color1.green).abs(),
+            (color2.blue - color1.blue).abs());
+
+        differences[x][y] = pixelSubtraction.value;
       }
     }
 

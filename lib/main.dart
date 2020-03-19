@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:image/image.dart' as img;
 
 import 'helpers/turbidity.dart';
 import 'helpers/utils.dart';
@@ -31,15 +32,19 @@ IconData getCameraLensIcon(CameraLensDirection direction) {
   throw ArgumentError('Direção da câmera desconhecida.');
 }
 
-class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
+class _MainCameraState extends State<MainCamera>
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   CameraController _controller;
   String originalImagePath;
   String flashImagePath;
   CameraLensDirection currentCamera;
   final PermissionHandler _permissionHandler = PermissionHandler();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-
   bool _hasTorch = false;
+
+  // TODO: Componentizar esse scanner
+  AnimationController _barScannerAnimationController;
+  Animation _barScannerPositionAnimation;
 
   @override
   void initState() {
@@ -49,6 +54,12 @@ class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
       onNewCameraSelected(cameras[0]);
     });
     setLastAnalysis();
+
+    _barScannerAnimationController =
+        AnimationController(vsync: this, duration: Duration(milliseconds: 999));
+    _barScannerPositionAnimation = Tween<double>(begin: 0, end: 100)
+        .animate(_barScannerAnimationController);
+    _changeScannerPosition();
   }
 
   Future<void> deviceHasTorch() async {
@@ -61,6 +72,19 @@ class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
     setState(() {
       _hasTorch = hasTorch;
     });
+  }
+
+  void _changeScannerPosition() async {
+    while (true) {
+      await new Future.delayed(const Duration(seconds: 1), () {
+        if (_barScannerAnimationController.status ==
+            AnimationStatus.completed) {
+          _barScannerAnimationController.reverse();
+        } else {
+          _barScannerAnimationController.forward();
+        }
+      });
+    }
   }
 
   Future<void> requestPermissions(List<PermissionGroup> permissions,
@@ -167,16 +191,48 @@ class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
       }
       return ClipRect(
         child: Container(
-          child: Transform.scale(
-            scale: _controller.value.aspectRatio / size.aspectRatio,
-            child: Center(
-              child: AspectRatio(
-                aspectRatio: _controller.value.aspectRatio,
-                child: CameraPreview(_controller),
+            child: Stack(
+          children: <Widget>[
+            Positioned.fill(
+                child: Transform.scale(
+              scale: _controller.value.aspectRatio / size.aspectRatio,
+              child: Center(
+                child: AspectRatio(
+                  aspectRatio: _controller.value.aspectRatio,
+                  child: CameraPreview(_controller),
+                ),
               ),
-            ),
-          ),
-        ),
+            )),
+            Positioned.fill(
+                child: Align(
+              alignment: Alignment.center,
+              child: Stack(
+                children: <Widget>[
+                  Container(
+                      width: MediaQuery.of(context).size.width / 1.3,
+                      height: MediaQuery.of(context).size.width / 1.3,
+                      decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          border:
+                              Border.all(color: Colors.blueAccent, width: 2))),
+                  AnimatedBuilder(
+                      animation: _barScannerPositionAnimation,
+                      builder: (context, child) => Positioned(
+                            top: _barScannerPositionAnimation.value,
+                            child: Align(
+                              alignment: Alignment.center,
+                              child: Container(
+                                height: 4,
+                                width: MediaQuery.of(context).size.width,
+                                color: Colors.greenAccent,
+                              ),
+                            ),
+                          ))
+                ],
+              ),
+            ))
+          ],
+        )),
       );
     }
   }
@@ -240,14 +296,14 @@ class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
     //     );
     //   }
 
-      
     // }
+    toggles.add(_takePhotoButton());
     toggles.add(_thumbnailWidget());
 
     return Positioned(
         child: Column(
             mainAxisAlignment: MainAxisAlignment.end,
-            children: <Widget>[_takePhotoButton(), Row(children: toggles)]));
+            children: <Widget>[Row(children: toggles)]));
   }
 
   String timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
@@ -291,20 +347,16 @@ class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
         if (filePath == null) return;
 
         // Analisa a turbidez
-        var finalImage = await ImageHelper.getImage(filePath);
+        var originalImage = await ImageHelper.getImage(filePath);
         var exifTags =
             await readExifFromBytes(File(filePath).readAsBytesSync());
         var exposureTime = ImageHelper.getExposureTime(exifTags);
         var iso = ImageHelper.getIso(exifTags);
 
-        var turbidity = Turbidity.getTurbidity(finalImage,
-            exposureTime: exposureTime, isoSpeed: iso);
-
         // Ativa o flash
         if (_hasTorch) {
-
           _toggleTorch(true);
-          
+
           takePicture().then((String _flashImagepath) async {
             _toggleTorch(false);
             if (mounted) {
@@ -315,8 +367,8 @@ class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
 
               var flashImage = await ImageHelper.getImage(_flashImagepath);
 
-              finalImage =
-                  ImageHelper.getImageSubtraction(finalImage, flashImage);
+              var finalImage = ImageHelper.getImageSubtraction(
+                  img.grayscale(originalImage), img.grayscale(flashImage));
 
               await ImageHelper.saveImage(finalImage, flashImagePath)
                   .then((String newPath) async {
@@ -324,12 +376,22 @@ class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
                   originalImagePath = newPath;
                 });
               });
+
+              // TODO: trocar pela quantização de pixels pretos
+              var turbidity = Turbidity.getTurbidity(finalImage,
+                  exposureTime: exposureTime, isoSpeed: iso);
+
+              Utils.showInSnackBar(_scaffoldKey,
+                  "$turbidity - ${Turbidity.getNTURange(turbidity)}");
             }
           });
-        }
+        } else {
+          var turbidity = Turbidity.getTurbidity(originalImage,
+              exposureTime: exposureTime, isoSpeed: iso);
 
-        Utils.showInSnackBar(
-            _scaffoldKey, "$turbidity - ${Turbidity.getNTURange(turbidity)}");
+          Utils.showInSnackBar(
+              _scaffoldKey, "$turbidity - ${Turbidity.getNTURange(turbidity)}");
+        }
       }
     });
   }
@@ -369,14 +431,12 @@ class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
     Utils.showInSnackBar(_scaffoldKey, 'Error: ${e.code}\n${e.description}');
   }
 
-   /// Ativa/Inativa a Lanterna
+  /// Ativa/Inativa a Lanterna
   Future<void> _toggleTorch(bool value) async {
-
     if (_hasTorch) {
       if (value) {
         _controller.torchOn();
-      }
-      else {
+      } else {
         _controller.torchOff();
       }
     }
