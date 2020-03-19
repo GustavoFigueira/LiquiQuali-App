@@ -16,7 +16,9 @@ dependencies:
   permission_handler:
   shared_preferences:
   exif:
-  lamp: ^0.0.6
+
+  fflashlight:
+    path: ../fflashlight
 
 dev_dependencies:
    flutter_test:

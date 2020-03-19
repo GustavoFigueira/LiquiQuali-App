@@ -78,7 +78,11 @@ class ImageHelper {
 
     for (int x = 0; x < _width; x++) {
       for (int y = 0; y < _height; y++) {
-        int clr = 255 - (255.0 / maxDifference * differences[x][y]).toInt();
+        var factor = maxDifference * differences[x][y];
+        if (factor == 0) {
+          factor = 1;
+        }
+        int clr = 255 - 255.0 ~/ factor;
         finalImage.setPixel(x, y, Color.fromARGB(clr, clr, clr, clr).value);
       }
     }
@@ -91,7 +95,8 @@ class Utils {
   static void logError(String code, String message) =>
       print('Error: $code\nError Message: $message');
 
-  static void showInSnackBar(GlobalKey<ScaffoldState> _scaffoldKey, String message) {
+  static void showInSnackBar(
+      GlobalKey<ScaffoldState> _scaffoldKey, String message) {
     _scaffoldKey.currentState.showSnackBar(SnackBar(content: Text(message)));
   }
 }

@@ -7,7 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:lamp/lamp.dart';
+import 'package:fflashlight/fflashlight.dart';
 
 import 'helpers/turbidity.dart';
 import 'helpers/utils.dart';
@@ -40,9 +40,8 @@ class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
   final PermissionHandler _permissionHandler = PermissionHandler();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  bool _hasFlash = false;
-  bool _isOn = false;
-  double _intensity = 1.0;
+  bool _hasFlashlight = false;
+  bool enableTorch = false;
 
   @override
   void initState() {
@@ -51,15 +50,26 @@ class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
     requestPermissions(<PermissionGroup>[PermissionGroup.camera]).then((bool) {
       onNewCameraSelected(cameras[0]);
     });
-    setLastAnalysis();
     initPlatformState();
+    setLastAnalysis();
   }
 
   Future<void> initPlatformState() async {
-    bool hasFlash = await Lamp.hasLamp;
-    print("Device has flash ? $hasFlash");
+    bool hasFlashlight;
+    // Platform messages may fail, so we use a try/catch PlatformException.
+    try {
+      hasFlashlight = await Fflashlight.hasFlashlight;
+    } on PlatformException {
+      hasFlashlight = false;
+    }
+
+    // If the widget was removed from the tree while the asynchronous platform
+    // message was in flight, we want to discard the reply rather than calling
+    // setState to update our non-existent appearance.
+    if (!mounted) return;
+
     setState(() {
-      _hasFlash = hasFlash;
+      _hasFlashlight = hasFlashlight;
     });
   }
 
@@ -85,15 +95,6 @@ class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
         originalImagePath = filesList.last?.path ?? "";
       });
     }
-  }
-
-  Future _turnFlash() async {
-    _isOn ? Lamp.turnOff() : Lamp.turnOn(intensity: _intensity);
-    var f = await Lamp.hasLamp;
-    setState(() {
-      _hasFlash = f;
-      _isOn = !_isOn;
-    });
   }
 
   @override
@@ -307,9 +308,12 @@ class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
             exposureTime: exposureTime, isoSpeed: iso);
 
         // Ativa o flash
-        if (_hasFlash) {
-          _turnFlash();
+        if (_hasFlashlight) {
+
+          _toggleTorch(true);
+          
           takePicture().then((String _flashImagepath) async {
+            _toggleTorch(false);
             if (mounted) {
               setState(() {
                 flashImagePath = _flashImagepath;
@@ -370,6 +374,26 @@ class _MainCameraState extends State<MainCamera> with WidgetsBindingObserver {
   void _showCameraException(CameraException e) {
     Utils.logError(e.code, e.description);
     Utils.showInSnackBar(_scaffoldKey, 'Error: ${e.code}\n${e.description}');
+  }
+
+   /// Toggle Torch
+  Future<void> _toggleTorch(bool value) async {
+    bool hasTorch = false;
+
+    if (_controller != null) {
+      hasTorch = await _controller.hasTorch;
+    }
+
+    if (hasTorch) {
+      enableTorch = value;
+      if (enableTorch) {
+        _controller.torchOn();
+      } else {
+        _controller.torchOff();
+      }
+    }
+
+    setState(() {});
   }
 }
 
