@@ -42,11 +42,10 @@ class _MainCameraState extends State<MainCamera>
   String originalImagePath;
   String flashImagePath;
   bool _hasFlash = false;
+  bool isProcessing = false;
   String timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
   final PermissionHandler _permissionHandler = PermissionHandler();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  // TODO: Componentizar esse scanner
-  double _scannerSize = 100;
 
   @override
   void initState() {
@@ -82,7 +81,8 @@ class _MainCameraState extends State<MainCamera>
   Widget build(BuildContext context) {
     return Scaffold(
         key: _scaffoldKey,
-        drawer: Drawer(child: MainMenuDrawer()),
+        drawer:
+            isProcessing ? SizedBox.shrink() : Drawer(child: MainMenuDrawer()),
         body: Stack(
           children: <Widget>[
             _cameraPreviewWidget(),
@@ -129,34 +129,60 @@ class _MainCameraState extends State<MainCamera>
   }
 
   Widget _takePhotoButton() {
-    return Positioned(
-      bottom: 0,
-      child: Container(
-          margin: EdgeInsets.symmetric(vertical: 30),
-          child: RaisedButton.icon(
-              elevation: 4.0,
-              icon: Icon(Icons.photo_camera, color: Colors.white),
-              color: Colors.black54,
-              label: Text("Analisar",
-                  style: TextStyle(color: Colors.white, fontSize: 16.0)),
-              onPressed: () => onTakePictureButtonPressed())),
-    );
+    return isProcessing
+        ? SizedBox.shrink()
+        : Positioned(
+            bottom: 0,
+            child: Container(
+                margin: EdgeInsets.symmetric(vertical: 30),
+                child: RaisedButton.icon(
+                    elevation: 4.0,
+                    icon: Icon(Icons.photo_camera, color: Colors.white),
+                    color: Colors.black54,
+                    label: Text("Analisar",
+                        style: TextStyle(color: Colors.white, fontSize: 16.0)),
+                    onPressed: () => onTakePictureButtonPressed())),
+          );
   }
 
   Widget _customAppBar() {
-    return Positioned(
-        child: AppBar(
-      centerTitle: true,
-      title: Text("LiquiQuali",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            shadows: <Shadow>[
-              Shadow(
-                  offset: Offset(0, 0.3), blurRadius: 5, color: Colors.black54)
-            ],
-          )),
-      backgroundColor: Colors.transparent,
-    ));
+    return isProcessing
+        ? SizedBox.shrink()
+        : Positioned(
+            child: AppBar(
+            centerTitle: true,
+            title: Text("LiquiQuali",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  shadows: <Shadow>[
+                    Shadow(
+                        offset: Offset(0, 0.3),
+                        blurRadius: 5,
+                        color: Colors.black54)
+                  ],
+                )),
+            backgroundColor: Colors.transparent,
+          ));
+  }
+
+  Widget _processingWidget() {
+    return Positioned.fill(
+        child: Align(
+            alignment: Alignment.center,
+            child: Container(
+                width: MediaQuery.of(context).size.width / 1.3,
+                height: MediaQuery.of(context).size.width / 1.3,
+                child: Align(
+                    alignment: Alignment.center,
+                    child: Text('*ANALISANDO*\n Não mova seu dispositivo.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18))),
+                decoration: BoxDecoration(
+                    color: Colors.black54,
+                    border: Border.all(color: Colors.greenAccent, width: 2)))));
   }
 
   /// Display the preview from the camera (or a message if the preview is not available).
@@ -174,7 +200,7 @@ class _MainCameraState extends State<MainCamera>
       final size = MediaQuery.of(context).size;
 
       if (!_controller.value.isInitialized) {
-        return Container();
+        return SizedBox.shrink();
       }
       return ClipRect(
         child: Container(
@@ -190,39 +216,41 @@ class _MainCameraState extends State<MainCamera>
                 ),
               ),
             )),
-            Positioned.fill(
-                child: Align(
-              alignment: Alignment.center,
-              child: Stack(
-                children: <Widget>[
-                  Container(
-                      width: MediaQuery.of(context).size.width / 1.3,
-                      height: MediaQuery.of(context).size.width / 1.3,
-                      decoration: BoxDecoration(
-                          color: Colors.transparent,
-                          border:
-                              Border.all(color: Colors.blueAccent, width: 2))),
-                  Animator(
-                    tween: Tween<double>(
-                        begin: 0,
-                        end: MediaQuery.of(context).size.height / 2.6),
-                    duration: Duration(seconds: 1),
-                    cycles: 0,
-                    builder: (anim) => Positioned(
-                      top: anim.value,
-                      child: Align(
-                        alignment: Alignment.center,
-                        child: Container(
-                          height: 4,
-                          width: MediaQuery.of(context).size.width,
-                          color: Colors.greenAccent,
-                        ),
-                      ),
+            isProcessing
+                ? _processingWidget()
+                : Positioned.fill(
+                    child: Align(
+                    alignment: Alignment.center,
+                    child: Stack(
+                      children: <Widget>[
+                        Container(
+                            width: MediaQuery.of(context).size.width / 1.3,
+                            height: MediaQuery.of(context).size.width / 1.3,
+                            decoration: BoxDecoration(
+                                color: Colors.transparent,
+                                border: Border.all(
+                                    color: Colors.blueAccent, width: 2))),
+                        Animator(
+                          tween: Tween<double>(
+                              begin: 0,
+                              end: MediaQuery.of(context).size.height / 2.6),
+                          duration: Duration(seconds: 1),
+                          cycles: 0,
+                          builder: (anim) => Positioned(
+                            top: anim.value,
+                            child: Align(
+                              alignment: Alignment.center,
+                              child: Container(
+                                height: 4,
+                                width: MediaQuery.of(context).size.width,
+                                color: Colors.greenAccent,
+                              ),
+                            ),
+                          ),
+                        )
+                      ],
                     ),
-                  )
-                ],
-              ),
-            ))
+                  ))
           ],
         )),
       );
@@ -231,25 +259,31 @@ class _MainCameraState extends State<MainCamera>
 
   /// Display the thumbnail of the captured image or video.
   Widget _thumbnailWidget() {
-    return Positioned(
-      bottom: 0,
-      right: 0,
-      child: originalImagePath == null? Container() : GestureDetector(
-        child: Container(
-          margin: EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-          height: 60,
-          width: 40,
-          color: Colors.black54,
-          child: Image(
-            image: FileImage(File(originalImagePath)),
-            fit: BoxFit.fitWidth,
-          ),
-        ),
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) {
-          return PreviewPage(originalImagePath);
-        })),
-      ),
-    );
+    return isProcessing
+        ? SizedBox.shrink()
+        : Positioned(
+            bottom: 0,
+            right: 0,
+            child: originalImagePath == null
+                ? SizedBox.shrink()
+                : GestureDetector(
+                    child: Container(
+                      margin:
+                          EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+                      height: 60,
+                      width: 40,
+                      color: Colors.black54,
+                      child: Image(
+                        image: FileImage(File(originalImagePath)),
+                        fit: BoxFit.fitWidth,
+                      ),
+                    ),
+                    onTap: () =>
+                        Navigator.push(context, MaterialPageRoute(builder: (_) {
+                      return PreviewPage(originalImagePath);
+                    })),
+                  ),
+          );
   }
 
   Widget _cameraActions() {
@@ -268,11 +302,8 @@ class _MainCameraState extends State<MainCamera>
     if (_controller != null) {
       await _controller.dispose();
     }
-    _controller = CameraController(
-      cameraDescription,
-      ResolutionPreset.medium,
-      autoFocusMode: AutoFocusMode.continuous
-    );
+    _controller = CameraController(cameraDescription, ResolutionPreset.medium,
+        autoFocusMode: AutoFocusMode.continuous);
 
     _controller.addListener(() {
       if (mounted) setState(() {});
@@ -293,10 +324,17 @@ class _MainCameraState extends State<MainCamera>
     }
   }
 
+  void setProcessingState(bool value) {
+    setState(() {
+      isProcessing = value;
+    });
+  }
+
   void onTakePictureButtonPressed() {
     deviceHasFlash();
+    setProcessingState(true);
 
-     _controller.setFlash(mode: FlashMode.off);
+    _controller.setFlash(mode: FlashMode.off);
     takePicture().then((String filePath) async {
       if (mounted) {
         setState(() {
@@ -313,9 +351,11 @@ class _MainCameraState extends State<MainCamera>
 
         // Ativa o flash
         if (_hasFlash) {
-          _controller.setFlash(mode: FlashMode.alwaysFlash);
-          
+          _controller.setFlash(mode: FlashMode.torch);
+
           takePicture().then((String _flashImagepath) async {
+            _controller.setFlash(mode: FlashMode.off);
+
             if (mounted) {
               setState(() {
                 flashImagePath = _flashImagepath;
@@ -324,8 +364,8 @@ class _MainCameraState extends State<MainCamera>
 
               var flashImage = await ImageHelper.getImage(_flashImagepath);
 
-              var finalImage = ImageHelper.getImageSubtraction(
-                  img.grayscale(originalImage), img.grayscale(flashImage));
+              var finalImage =
+                  ImageHelper.getImageSubtraction(originalImage, flashImage);
 
               await ImageHelper.saveImage(finalImage, flashImagePath)
                   .then((String newPath) async {
@@ -340,6 +380,8 @@ class _MainCameraState extends State<MainCamera>
 
               Utils.showInSnackBar(_scaffoldKey,
                   "$turbidity - ${Turbidity.getNTURange(turbidity)}");
+
+              setProcessingState(false);
             }
           });
         } else {
@@ -348,6 +390,8 @@ class _MainCameraState extends State<MainCamera>
 
           Utils.showInSnackBar(
               _scaffoldKey, "$turbidity - ${Turbidity.getNTURange(turbidity)}");
+
+          setProcessingState(false);
         }
       }
     });
@@ -392,10 +436,7 @@ class _MainCameraState extends State<MainCamera>
 class CameraApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: MainCamera(),
-    );
+    return MaterialApp(debugShowCheckedModeBanner: false, home: MainCamera());
   }
 }
 
