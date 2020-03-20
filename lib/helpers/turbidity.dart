@@ -28,22 +28,22 @@ class Turbidity {
 
     var width = image.width;
     var height = image.height;
-    var indeX = 0;
-    var indexY = 0;
+    var _x = 0;
+    var _y = 0;
 
     // Utiliza apenas o quadrado central da amostra.
     // Caso seja 0, utiliza a imagem completa.
     if (sampleSize > 0) {
       width = sampleSize * 2;
       height = sampleSize * 2;
-      indeX = sampleSize;
-      indexY = sampleSize;
+      _x = sampleSize;
+      _y = sampleSize;
     }
 
-    for (indeX = 0; indeX < width; indeX++) {
-      for (indexY = 0; indexY < height; indexY++) {
+    for (var x = _x; x < width; x++) {
+      for (var y = _y; y < height; y++) {
 
-        var pixel = image.getPixelSafe(indeX, indexY);
+        var pixel = image.getPixelSafe(x, y);
         var pixelColor = Color(pixel);
 
         // Relative Radiance Formula 1

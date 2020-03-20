@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
-import 'package:flutter/services.dart';
+import 'package:aeyrium_sensor/aeyrium_sensor.dart';
 import 'package:exif/exif.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:camera/camera.dart';
@@ -15,6 +16,8 @@ import 'helpers/turbidity.dart';
 import 'helpers/utils.dart';
 import 'pages/preview_page.dart';
 import 'pages/shared/main_menu.dart';
+
+// TODO: fazer alerta a ser apresentando uma vez falandoq ue o flahs será ativado
 
 class MainCamera extends StatefulWidget {
   @override
@@ -43,6 +46,7 @@ class _MainCameraState extends State<MainCamera>
   String flashImagePath;
   bool _hasFlash = false;
   bool isProcessing = false;
+  int pitch = 0;
   String timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
   final PermissionHandler _permissionHandler = PermissionHandler();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -56,6 +60,13 @@ class _MainCameraState extends State<MainCamera>
       onNewCameraSelected(cameras[0]);
     });
     setLastAnalysis();
+
+    // Pitch (rotação no Eixo X)
+    AeyriumSensor.sensorEvents.listen((SensorEvent event) {
+      var radians = event.pitch;
+      var degrees = (180 / pi) * radians;
+      pitch = degrees.round().abs();
+    });
   }
 
   @override
@@ -154,6 +165,7 @@ class _MainCameraState extends State<MainCamera>
         ? SizedBox.shrink()
         : AppBar(
             centerTitle: true,
+            elevation: 0,
             title: Text("LiquiQuali",
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
@@ -164,28 +176,49 @@ class _MainCameraState extends State<MainCamera>
                         color: Colors.black54)
                   ],
                 )),
-            backgroundColor: Colors.transparent,
-          );
+            backgroundColor: Colors.transparent);
   }
 
   Widget _processingWidget() {
     return Positioned.fill(
         child: Align(
             alignment: Alignment.center,
-            child: Container(
-                width: scannerSize,
-                height: scannerSize,
-                child: Align(
-                    alignment: Alignment.center,
-                    child: Text('*ANALISANDO*\n Não mova seu dispositivo.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18))),
-                decoration: BoxDecoration(
-                    color: Colors.black54,
-                    border: Border.all(color: Colors.greenAccent, width: 2)))));
+            child: Stack(
+              children: <Widget>[
+                Container(
+                    width: scannerSize,
+                    height: scannerSize,
+                    child: Align(
+                        alignment: Alignment.center,
+                        child: Text('*ANALISANDO*\n Não mova seu dispositivo.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18))),
+                    decoration: BoxDecoration(
+                        color: Colors.black54,
+                        border:
+                            Border.all(color: Colors.greenAccent, width: 2))),
+                Animator(
+                  tween: Tween<double>(
+                      begin: 0, end: MediaQuery.of(context).size.height / 2.6),
+                  duration: Duration(seconds: 1),
+                  cycles: 0,
+                  builder: (anim) => Positioned(
+                    top: anim.value,
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: Container(
+                        height: 4,
+                        width: MediaQuery.of(context).size.width,
+                        color: Colors.redAccent,
+                      ),
+                    ),
+                  ),
+                )
+              ],
+            )));
   }
 
   /// Display the preview from the camera (or a message if the preview is not available).
@@ -232,25 +265,7 @@ class _MainCameraState extends State<MainCamera>
                             decoration: BoxDecoration(
                                 color: Colors.transparent,
                                 border: Border.all(
-                                    color: Colors.blueAccent, width: 2))),
-                        Animator(
-                          tween: Tween<double>(
-                              begin: 0,
-                              end: MediaQuery.of(context).size.height / 2.6),
-                          duration: Duration(seconds: 1),
-                          cycles: 0,
-                          builder: (anim) => Positioned(
-                            top: anim.value,
-                            child: Align(
-                              alignment: Alignment.center,
-                              child: Container(
-                                height: 4,
-                                width: MediaQuery.of(context).size.width,
-                                color: Colors.greenAccent,
-                              ),
-                            ),
-                          ),
-                        )
+                                    color: Colors.greenAccent, width: 2)))
                       ],
                     ),
                   ))

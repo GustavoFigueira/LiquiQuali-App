@@ -17,6 +17,7 @@ dependencies:
   shared_preferences:
   exif:
   animator: ^1.0.0+5
+  aeyrium_sensor: ^1.0.7
 
 dev_dependencies:
    flutter_test:
