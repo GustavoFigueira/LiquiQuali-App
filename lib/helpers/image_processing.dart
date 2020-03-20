@@ -86,7 +86,7 @@ class ImageHelper {
     return finalImage;
   }
 
-  static double darksAmountPercentage(img.Image subtractionImage) {
+  static double imageClarityAmount(img.Image subtractionImage) {
     var darksAmountPercentage = 0.0;
     var darksAmount = 0.0;
     var width = subtractionImage.width;

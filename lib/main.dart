@@ -47,10 +47,10 @@ class _MainCameraState extends State<MainCamera>
   bool _hasFlash = false;
   bool isProcessing = false;
   int pitch = 0;
+  double scannerSize = 200;
   String timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
   final PermissionHandler _permissionHandler = PermissionHandler();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  double scannerSize = 200;
 
   @override
   void initState() {
@@ -65,7 +65,9 @@ class _MainCameraState extends State<MainCamera>
     AeyriumSensor.sensorEvents.listen((SensorEvent event) {
       var radians = event.pitch;
       var degrees = (180 / pi) * radians;
-      pitch = degrees.round().abs();
+      this.setState(() {
+        pitch = degrees.round().abs();
+      });
     });
   }
 
@@ -265,7 +267,50 @@ class _MainCameraState extends State<MainCamera>
                             decoration: BoxDecoration(
                                 color: Colors.transparent,
                                 border: Border.all(
-                                    color: Colors.greenAccent, width: 2)))
+                                    color: Colors.greenAccent, width: 2))),
+                        Container(
+                          alignment: Alignment.center,
+                          width: scannerSize,
+                          height: scannerSize,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: <Widget>[
+                              Text("${pitch.toString()}°",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                      color: pitch == 45
+                                          ? Colors.green
+                                          : Colors.redAccent,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 48)),
+                              RichText(
+                                textAlign: TextAlign.center,
+                                text: TextSpan(
+                                  text: 'Mantenha seu dispositivo inclinado à ',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18),
+                                  children: <TextSpan>[
+                                    TextSpan(
+                                        text: '45°',
+                                        style: TextStyle(
+                                            color: Colors.greenAccent,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 18)),
+                                    TextSpan(
+                                        text: '.',
+                                        style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 18))
+                                  ],
+                                ),
+                              )
+                            ],
+                          ),
+                        )
                       ],
                     ),
                   ))
@@ -352,80 +397,88 @@ class _MainCameraState extends State<MainCamera>
   }
 
   void onTakePictureButtonPressed() {
-    deviceHasFlash();
-    setProcessingState(true);
+    try {
+      setProcessingState(true);
+      deviceHasFlash();
+      _controller.setFlash(mode: FlashMode.off);
 
-    _controller.setFlash(mode: FlashMode.off);
-    takePicture().then((String filePath) async {
-      if (mounted) {
-        setState(() {
-          originalImagePath = filePath;
-        });
-        if (filePath == null) return;
-
-        // Analisa a turbidez
-        var originalImage = await ImageHelper.getImage(filePath);
-        var exifTags =
-            await readExifFromBytes(File(filePath).readAsBytesSync());
-        var exposureTime = ImageHelper.getExposureTime(exifTags);
-        var iso = ImageHelper.getIso(exifTags);
-
-        // Ativa o flash
-        if (_hasFlash) {
-          _controller.setFlash(mode: FlashMode.torch);
-
-          takePicture().then((String _flashImagepath) async {
-            _controller.setFlash(mode: FlashMode.off);
-
-            if (mounted) {
-              setState(() {
-                flashImagePath = _flashImagepath;
-              });
-              if (_flashImagepath == null) return;
-
-              var flashImage = await ImageHelper.getImage(_flashImagepath);
-
-              var finalImage =
-                  ImageHelper.getImageSubtraction(originalImage, flashImage);
-
-              var darksAmount = ImageHelper.darksAmountPercentage(finalImage);
-
-              await ImageHelper.saveImage(finalImage, flashImagePath)
-                  .then((String newPath) async {
-                setState(() {
-                  originalImagePath = newPath;
-                });
-              });
-
-              // TODO: trocar pela quantização de pixels pretos
-              var turbidity = Turbidity.getTurbidity(finalImage,
-                  exposureTime: exposureTime,
-                  isoSpeed: iso,
-                  sampleSize: scannerSize.round());
-
-              // Apresenta a turbidez final
-              Utils.showInSnackBar(_scaffoldKey,
-                  "$turbidity - ${Turbidity.getNTURange(turbidity)}");
-
-              setProcessingState(false);
-            }
+      takePicture().then((String filePath) async {
+        if (mounted) {
+          setState(() {
+            originalImagePath = filePath;
           });
-        }
-        // Caso o dispositivo não tenha flash
-        else {
-          var turbidity = Turbidity.getTurbidity(originalImage,
-              exposureTime: exposureTime,
-              isoSpeed: iso,
-              sampleSize: scannerSize.round());
+          if (filePath == null) return;
 
-          // Apresenta a turbidez final
-          Utils.showInSnackBar(
-              _scaffoldKey, "$turbidity - ${Turbidity.getNTURange(turbidity)}");
+          // Analisa a turbidez
+          var originalImage = await ImageHelper.getImage(filePath);
+          var exifTags =
+              await readExifFromBytes(File(filePath).readAsBytesSync());
+          var exposureTime = ImageHelper.getExposureTime(exifTags);
+          var iso = ImageHelper.getIso(exifTags);
 
-          setProcessingState(false);
+          // Ativa o flash
+          if (_hasFlash) {
+            _controller.setFlash(mode: FlashMode.torch);
+
+            takePicture().then((String _flashImagepath) async {
+              _controller.setFlash(mode: FlashMode.off);
+
+              if (mounted) {
+                setState(() {
+                  flashImagePath = _flashImagepath;
+                });
+                if (_flashImagepath == null) return;
+
+                var flashImage = await ImageHelper.getImage(_flashImagepath);
+
+                var finalImage =
+                    ImageHelper.getImageSubtraction(originalImage, flashImage);
+
+                var clarityAmount = ImageHelper.imageClarityAmount(finalImage);
+
+                await ImageHelper.saveImage(finalImage, flashImagePath)
+                    .then((String newPath) async {
+                  setState(() {
+                    originalImagePath = newPath;
+                  });
+                });
+
+                // TODO: trocar pela quantização de pixels pretos
+                var turbidity = Turbidity.getTurbidity(finalImage,
+                    exposureTime: exposureTime,
+                    isoSpeed: iso,
+                    sampleSize: scannerSize.round());
+
+                // Multiplica a turbidez pelo coeficiente de pixels escuros
+                turbidity = (turbidity / clarityAmount) * 1000;
+
+                // Apresenta a turbidez final
+                Utils.showInSnackBar(_scaffoldKey,
+                    "$turbidity - ${Turbidity.getNTURange(turbidity)}");
+
+                setProcessingState(false);
+              }
+            });
+          }
+          // Caso o dispositivo não tenha flash
+          else {
+            var turbidity = Turbidity.getTurbidity(originalImage,
+                exposureTime: exposureTime,
+                isoSpeed: iso,
+                sampleSize: scannerSize.round());
+
+            // Apresenta a turbidez final
+            Utils.showInSnackBar(_scaffoldKey,
+                "$turbidity - ${Turbidity.getNTURange(turbidity)}");
+
+            setProcessingState(false);
+          }
         }
-      }
-    });
+      });
+    } on Exception catch (e) {
+      _controller.setFlash(mode: FlashMode.off);
+      Utils.showInSnackBar(_scaffoldKey, e.toString());
+    }
   }
 
   Future<String> takePicture() async {
