@@ -13,8 +13,8 @@ class Turbidity {
     waterRadiance = getRelativeRadiance(image, exposureTime, isoSpeed, sampleSize);
 
     // Remote Sensing Reflectance Formula
-    rrs = (waterRadiance - (0.028 * skyRadiance)) / (pi / 0.18) * cardRadiance;
-    //rrs = waterRadiance;
+    //rrs = (waterRadiance - (0.028 * skyRadiance)) / (pi / 0.18) * cardRadiance;
+    rrs = waterRadiance;
 
     return rrs;
   }

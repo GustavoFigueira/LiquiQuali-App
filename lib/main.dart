@@ -18,6 +18,7 @@ import 'pages/preview_page.dart';
 import 'pages/shared/main_menu.dart';
 
 // TODO: fazer alerta a ser apresentando uma vez falandoq ue o flahs será ativado
+// TODO: funncção de compartilhar imagem com textos da medição
 
 class MainCamera extends StatefulWidget {
   @override
@@ -400,6 +401,7 @@ class _MainCameraState extends State<MainCamera>
     try {
       setProcessingState(true);
       deviceHasFlash();
+      _controller.pausePreview();
       _controller.setFlash(mode: FlashMode.off);
 
       takePicture().then((String filePath) async {
@@ -455,8 +457,6 @@ class _MainCameraState extends State<MainCamera>
                 // Apresenta a turbidez final
                 Utils.showInSnackBar(_scaffoldKey,
                     "$turbidity - ${Turbidity.getNTURange(turbidity)}");
-
-                setProcessingState(false);
               }
             });
           }
@@ -471,12 +471,15 @@ class _MainCameraState extends State<MainCamera>
             Utils.showInSnackBar(_scaffoldKey,
                 "$turbidity - ${Turbidity.getNTURange(turbidity)}");
 
-            setProcessingState(false);
           }
+
+          _controller.resumePreview();
+          setProcessingState(false);
         }
       });
     } on Exception catch (e) {
       _controller.setFlash(mode: FlashMode.off);
+      _controller.resumePreview();
       Utils.showInSnackBar(_scaffoldKey, e.toString());
     }
   }
