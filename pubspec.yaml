@@ -11,14 +11,15 @@ dependencies:
     sdk: flutter
 
   cupertino_icons: ^0.1.2
-  camera:
-  path_provider:
-  permission_handler:
-  shared_preferences:
-  exif:
+  camerawesome: ^0.1.1+1
+  path_provider: ^1.6.21
+  permission_handler: ^5.0.1+1
+  shared_preferences: ^0.5.12+2
+  exif: ^1.0.3
   animator: ^1.0.0+5
   aeyrium_sensor: ^1.0.7
-
+  image: ^2.1.18
+  
 dev_dependencies:
    flutter_test:
     sdk: flutter

@@ -69,8 +69,8 @@ class Turbidity {
     rrs = getRemoteSensingReflectance(image, exposureTime, isoSpeed, sampleSize);
 
     // Turbidity Formula
-    //turbidity = (22.57 * rrs) / (0.044 - rrs);
-    turbidity = (27.7 * rrs) / (0.05 - rrs);
+    turbidity = (22.57 * rrs) / (0.044 - rrs);
+    //turbidity = (27.7 * rrs) / (0.05 - rrs);
     
     return turbidity.abs();
   }

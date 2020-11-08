@@ -95,7 +95,7 @@ class ImageHelper {
     for (var x = 0; x < subtractionImage.width; x++) {
       for (var y = 0; y < subtractionImage.height; y++) {
         var luminance = Color(subtractionImage.getPixelSafe(x, y)).computeLuminance();
-        if (luminance < 0.5) {
+        if (luminance < 0.7) {
           darksAmount++;
         }
       }
