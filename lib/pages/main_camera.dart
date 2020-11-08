@@ -7,6 +7,7 @@ import 'package:LiquiQuali/helpers/image_processing.dart';
 import 'package:LiquiQuali/helpers/orientation_utils.dart';
 import 'package:LiquiQuali/helpers/turbidity.dart';
 import 'package:LiquiQuali/helpers/utils.dart';
+import 'package:aeyrium_sensor/aeyrium_sensor.dart';
 import 'package:animator/animator.dart';
 import 'package:camerawesome/models/orientations.dart';
 import 'package:exif/exif.dart';
@@ -18,21 +19,25 @@ import 'package:image/image.dart' as imgUtils;
 
 import 'package:path_provider/path_provider.dart';
 import 'package:camerawesome/camerawesome_plugin.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import 'preview_page.dart';
 import 'widgets/camera_buttons.dart';
+import 'widgets/main_menu.dart';
 import 'widgets/take_photo_button.dart';
 
 class MainCamera extends StatefulWidget {
   final bool randomPhotoName;
+  final Permission permission;
 
-  MainCamera({this.randomPhotoName = true});
+  MainCamera({this.randomPhotoName = true, this.permission});
 
   @override
   _MainCameraState createState() => _MainCameraState();
 }
 
 class _MainCameraState extends State<MainCamera> with TickerProviderStateMixin {
+  String originalImagePath;
   String flashImagePath;
   bool _hasFlash = false;
   bool isProcessing = false;
@@ -41,7 +46,8 @@ class _MainCameraState extends State<MainCamera> with TickerProviderStateMixin {
   String timestamp() => DateTime.now().millisecondsSinceEpoch.toString();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  String originalImagePath;
+  final Permission _permission = Permission.camera;
+  PermissionStatus _permissionStatus = PermissionStatus.undetermined;
 
   double bestSizeRatio;
 
@@ -54,8 +60,6 @@ class _MainCameraState extends State<MainCamera> with TickerProviderStateMixin {
   ValueNotifier<CameraFlashes> switchFlash = ValueNotifier(CameraFlashes.NONE);
 
   ValueNotifier<Size> photoSize = ValueNotifier(null);
-
-  ValueNotifier<Sensors> sensor = ValueNotifier(Sensors.BACK);
 
   PictureController _pictureController = new PictureController();
 
@@ -77,26 +81,33 @@ class _MainCameraState extends State<MainCamera> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _iconsAnimationController = AnimationController(
-      vsync: this,
-      duration: Duration(milliseconds: 300),
-    )..addStatusListener((status) {
-        if (status == AnimationStatus.completed) {
-          animationPlaying = false;
-        }
-      });
+    _listenForPermissionStatus();
+    requestPermission(_permission);
+    setLastAnalysis();
 
-    _previewAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 1300),
-      vsync: this,
-    );
-    _previewAnimation = Tween<Offset>(
-      begin: const Offset(-2.0, 0.0),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-        parent: _previewAnimationController,
-        curve: Curves.elasticOut,
-        reverseCurve: Curves.elasticIn));
+    // Pitch (rotação no Eixo X)
+    AeyriumSensor.sensorEvents.listen((SensorEvent event) {
+      var radians = event.pitch;
+      var degrees = (180 / pi) * radians;
+      this.setState(() {
+        pitch = degrees.round().abs();
+      });
+    });
+  }
+
+  void _listenForPermissionStatus() async {
+    final status = await _permission.status;
+    setState(() => _permissionStatus = status);
+  }
+
+  Future<void> requestPermission(Permission permission) async {
+    final status = await permission.request();
+
+    setState(() {
+      print(status);
+      _permissionStatus = status;
+      print(_permissionStatus);
+    });
   }
 
   @override
@@ -110,6 +121,21 @@ class _MainCameraState extends State<MainCamera> with TickerProviderStateMixin {
     _previewAnimationController.dispose();
     photoSize.dispose();
     super.dispose();
+  }
+
+  Future<void> setLastAnalysis() async {
+    final Directory extDir = await getApplicationDocumentsDirectory();
+    final String dirPath = '${extDir.path}/LiquiQuali';
+
+    // Caso queira deletar
+    //extDir.deleteSync(recursive: true);
+    // TODO: ordernar pela data de modificação
+    if (Directory(dirPath).existsSync()) {
+      var filesList = Directory(dirPath).listSync();
+      setState(() {
+        originalImagePath = filesList.last?.path ?? "";
+      });
+    }
   }
 
   @override
@@ -132,74 +158,77 @@ class _MainCameraState extends State<MainCamera> with TickerProviderStateMixin {
     }
 
     return Scaffold(
+        key: _scaffoldKey,
+        drawer:
+            isProcessing ? SizedBox.shrink() : Drawer(child: MainMenuDrawer()),
         body: Stack(
-      fit: StackFit.expand,
-      children: <Widget>[
-        buildFullscreenCamera(),
-        isProcessing
-            ? _processingWidget()
-            : Positioned.fill(
-                child: Align(
-                alignment: Alignment.center,
-                child: Stack(
-                  children: <Widget>[
-                    Container(
-                        width: scannerSize,
-                        height: scannerSize,
-                        decoration: BoxDecoration(
-                            color: Colors.transparent,
-                            border: Border.all(
-                                color: Colors.greenAccent, width: 2))),
-                    Container(
-                      alignment: Alignment.center,
-                      width: scannerSize,
-                      height: scannerSize,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: <Widget>[
-                          Text("${pitch.toString()}°",
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  color: pitch == 45
-                                      ? Colors.green
-                                      : Colors.redAccent,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 48)),
-                          RichText(
-                            textAlign: TextAlign.center,
-                            text: TextSpan(
-                              text: 'Mantenha seu dispositivo inclinado à ',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18),
-                              children: <TextSpan>[
-                                TextSpan(
-                                    text: '45°',
-                                    style: TextStyle(
-                                        color: Colors.greenAccent,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18)),
-                                TextSpan(
-                                    text: '.',
-                                    style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18))
-                              ],
-                            ),
-                          )
-                        ],
-                      ),
-                    )
-                  ],
-                ),
-              )),
-        _customAppBar(),
-        _cameraActions()
-      ],
-    ));
+          fit: StackFit.expand,
+          children: <Widget>[
+            buildFullscreenCamera(),
+            isProcessing
+                ? _processingWidget()
+                : Positioned.fill(
+                    child: Align(
+                    alignment: Alignment.center,
+                    child: Stack(
+                      children: <Widget>[
+                        Container(
+                            width: scannerSize,
+                            height: scannerSize,
+                            decoration: BoxDecoration(
+                                color: Colors.transparent,
+                                border: Border.all(
+                                    color: Colors.greenAccent, width: 2))),
+                        Container(
+                          alignment: Alignment.center,
+                          width: scannerSize,
+                          height: scannerSize,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: <Widget>[
+                              Text("${pitch.toString()}°",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                      color: pitch == 45
+                                          ? Colors.green
+                                          : Colors.redAccent,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 48)),
+                              RichText(
+                                textAlign: TextAlign.center,
+                                text: TextSpan(
+                                  text: 'Mantenha seu dispositivo inclinado à ',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18),
+                                  children: <TextSpan>[
+                                    TextSpan(
+                                        text: '45°',
+                                        style: TextStyle(
+                                            color: Colors.greenAccent,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 18)),
+                                    TextSpan(
+                                        text: '.',
+                                        style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 18))
+                                  ],
+                                ),
+                              )
+                            ],
+                          ),
+                        )
+                      ],
+                    ),
+                  )),
+            _customAppBar(),
+            _cameraActions()
+          ],
+        ));
   }
 
   Widget _takePhotoButton() {
@@ -276,7 +305,21 @@ class _MainCameraState extends State<MainCamera> with TickerProviderStateMixin {
                       ),
                     ),
                   ),
-                )
+                ),
+                Positioned(
+                    left: 0,
+                    bottom: 0,
+                    child: RaisedButton.icon(
+                      elevation: 4.0,
+                      icon: Icon(Icons.photo_camera, color: Colors.black),
+                      color: Colors.white,
+                      label: Text("Cancelar",
+                          style:
+                              TextStyle(color: Colors.black, fontSize: 16.0)),
+                      onPressed: () {
+                        setProcessingState(false);
+                      },
+                    ))
               ],
             )));
   }
@@ -325,9 +368,9 @@ class _MainCameraState extends State<MainCamera> with TickerProviderStateMixin {
     try {
       setProcessingState(true);
 
-      final Directory extDir = await getTemporaryDirectory();
+      final Directory extDir = await getApplicationDocumentsDirectory();
       var testDir =
-          await Directory('${extDir.path}/test').create(recursive: true);
+          await Directory('${extDir.path}/LiquiQuali').create(recursive: true);
       final String filePath =
           '${testDir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
 
@@ -555,7 +598,7 @@ class _MainCameraState extends State<MainCamera> with TickerProviderStateMixin {
                   : availableSizes[(availableSizes.length - 1 / 2).toInt()];
             },
             photoSize: photoSize,
-            sensor: sensor,
+            sensor: ValueNotifier(Sensors.BACK),
             switchFlashMode: switchFlash,
             onOrientationChanged: _onOrientationChange,
             onCameraStarted: () {
